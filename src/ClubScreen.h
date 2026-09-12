@@ -36,6 +36,7 @@ public:
 
 private:
     static lv_obj_t *screen;
+    static lv_obj_t *container;
     static std::vector<Club> clubs;
     static std::function<void(int, const String &)> selectedCallback;
     static SnapCallApi *apiInstance;

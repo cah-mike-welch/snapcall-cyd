@@ -2,6 +2,7 @@
 #include "config.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
 static const char *TAG = "[API]";
@@ -13,29 +14,57 @@ void SnapCallApi::begin()
 
 String SnapCallApi::httpGet(const String &endpoint)
 {
-    HTTPClient http;
     String url = String(SNAPCALL_API_BASE_URL) + endpoint;
 
     Serial.printf("%s Making GET request to: %s\n", TAG, url.c_str());
 
-    http.begin(url);
-    http.addHeader("Authorization", String("Bearer ") + SNAPCALL_API_KEY);
-    http.addHeader("Content-Type", "application/json");
-
-    int httpCode = http.GET();
-
     String payload = "";
-    if (httpCode == HTTP_CODE_OK)
-    {
-        payload = http.getString();
-        Serial.printf("%s HTTP %d\n", TAG, httpCode);
+    
+    // Handle HTTPS with certificate validation disabled
+    if (url.startsWith("https")) {
+        WiFiClientSecure client;
+        client.setInsecure();  // Skip SSL certificate validation
+        
+        HTTPClient http;
+        http.begin(client, url);
+        http.addHeader("Authorization", String("Bearer ") + SNAPCALL_API_KEY);
+        http.addHeader("Content-Type", "application/json");
+        
+        int httpCode = http.GET();
+        
+        if (httpCode == HTTP_CODE_OK) {
+            payload = http.getString();
+            Serial.printf("%s HTTP %d - Success\n", TAG, httpCode);
+        } else if (httpCode == 401) {
+            Serial.printf("%s HTTP 401 - Unauthorized (check API key)\n", TAG);
+            Serial.printf("%s Response: %s\n", TAG, http.getString().c_str());
+        } else if (httpCode == 301 || httpCode == 302 || httpCode == 307 || httpCode == 308) {
+            // Log redirect information
+            String location = http.header("Location");
+            Serial.printf("%s HTTP %d - Redirect to: %s\n", TAG, httpCode, location.c_str());
+        } else {
+            Serial.printf("%s HTTP Error: %d\n", TAG, httpCode);
+        }
+        
+        http.end();
+    } else {
+        HTTPClient http;
+        http.begin(url);
+        http.addHeader("Authorization", String("Bearer ") + SNAPCALL_API_KEY);
+        http.addHeader("Content-Type", "application/json");
+        
+        int httpCode = http.GET();
+        
+        if (httpCode == HTTP_CODE_OK) {
+            payload = http.getString();
+            Serial.printf("%s HTTP %d - Success\n", TAG, httpCode);
+        } else {
+            Serial.printf("%s HTTP Error: %d\n", TAG, httpCode);
+        }
+        
+        http.end();
     }
-    else
-    {
-        Serial.printf("%s HTTP Error: %d\n", TAG, httpCode);
-    }
-
-    http.end();
+    
     return payload;
 }
 
@@ -43,9 +72,9 @@ std::vector<Club> SnapCallApi::getClubs()
 {
     std::vector<Club> clubs;
 
-    Serial.printf("%s GET /clubs/\n", TAG);
+    Serial.printf("%s GET /clubs\n", TAG);
 
-    String payload = httpGet("/clubs/");
+    String payload = httpGet("/clubs");
 
     if (payload.isEmpty())
     {
@@ -54,7 +83,7 @@ std::vector<Club> SnapCallApi::getClubs()
     }
 
     // Parse JSON response
-    StaticJsonDocument<2048> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
 
     if (error)
@@ -107,7 +136,7 @@ BlindLevel SnapCallApi::getCurrentBlinds(int clubId)
     }
 
     // Parse JSON response
-    StaticJsonDocument<512> doc;
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
 
     if (error)

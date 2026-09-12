@@ -35,14 +35,14 @@ void TournamentScreen::show(SnapCallApi *api, int clubId, const String &clubName
     // Header with club name
     lv_obj_t *headerLabel = lv_label_create(screen);
     lv_label_set_text(headerLabel, clubName.c_str());
-    lv_obj_set_style_text_font(headerLabel, &lv_font_montserrat_22, LV_PART_MAIN);
+    lv_obj_set_style_text_font(headerLabel, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(headerLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_align(headerLabel, LV_ALIGN_TOP_MID, 0, 5);
 
     // BLINDS label
     lv_obj_t *blindsTitle = lv_label_create(screen);
     lv_label_set_text(blindsTitle, "BLINDS");
-    lv_obj_set_style_text_font(blindsTitle, &lv_font_montserrat_16, LV_PART_MAIN);
+    lv_obj_set_style_text_font(blindsTitle, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(blindsTitle, lv_color_hex(0xAAAAAA), LV_PART_MAIN);
     lv_obj_align(blindsTitle, LV_ALIGN_TOP_MID, 0, 35);
 
@@ -56,13 +56,13 @@ void TournamentScreen::show(SnapCallApi *api, int clubId, const String &clubName
 
     smallBlindLabel = lv_label_create(blindsContainer);
     lv_label_set_text(smallBlindLabel, "Loading...");
-    lv_obj_set_style_text_font(smallBlindLabel, &lv_font_montserrat_28, LV_PART_MAIN);
+    lv_obj_set_style_text_font(smallBlindLabel, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(smallBlindLabel, lv_color_hex(0x00FF00), LV_PART_MAIN);
     lv_obj_align(smallBlindLabel, LV_ALIGN_CENTER, 0, -10);
 
     bigBlindLabel = lv_label_create(blindsContainer);
     lv_label_set_text(bigBlindLabel, "");
-    lv_obj_set_style_text_font(bigBlindLabel, &lv_font_montserrat_12, LV_PART_MAIN);
+    lv_obj_set_style_text_font(bigBlindLabel, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(bigBlindLabel, lv_color_hex(0xCCCCCC), LV_PART_MAIN);
     lv_obj_align(bigBlindLabel, LV_ALIGN_CENTER, 0, 15);
 
@@ -83,7 +83,7 @@ void TournamentScreen::show(SnapCallApi *api, int clubId, const String &clubName
     // Time display
     timeLabel = lv_label_create(screen);
     lv_label_set_text(timeLabel, "--:--");
-    lv_obj_set_style_text_font(timeLabel, &lv_font_montserrat_36, LV_PART_MAIN);
+    lv_obj_set_style_text_font(timeLabel, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_set_style_text_color(timeLabel, lv_color_hex(0xFF4444), LV_PART_MAIN);
     lv_obj_align(timeLabel, LV_ALIGN_CENTER, 0, 170);
 
