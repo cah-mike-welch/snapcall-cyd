@@ -1,7 +1,18 @@
 #include "Display.h"
 #include "config.h"
+#include <XPT2046_Touchscreen.h>
+#include <SPI.h>
 
 static const char *TAG = "[DISPLAY]";
+
+// XPT2046 Touchscreen instance
+XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
+
+// Calibration values for ESP32-2432S028
+#define TOUCH_X_MIN 200
+#define TOUCH_X_MAX 3900
+#define TOUCH_Y_MIN 200
+#define TOUCH_Y_MAX 3900
 
 // TFT_eSPI instance
 TFT_eSPI Display::tft;
@@ -14,23 +25,38 @@ static lv_color_t buf[DISPLAY_WIDTH * 40]; // 320 * 40 buffer
 static lv_indev_drv_t indev_drv;
 static lv_indev_t *indev;
 
-// Touch input - Placeholder for future XPT2046 support
-// For now, using LVGL's built-in pointer input
-
-// XPT2046 touch reading - use TFT_eSPI's built-in touch support
+// Touch input
 static uint16_t lastX = 0, lastY = 0;
 static bool lastTouched = false;
+static uint32_t diagnostic_count = 0;
 
 static bool readTouch()
 {
-    uint16_t t_x = 0, t_y = 0;
+    // Check if touchscreen has new data via interrupt pin
+    if (!ts.tirqTouched())
+    {
+        lastTouched = false;
+        return false;
+    }
     
-    if (Display::getTFT().getTouch(&t_x, &t_y)) {
-        lastX = t_x;
-        lastY = t_y;
+    // Read coordinates via library
+    TS_Point p = ts.getPoint();
+    
+    if (p.z > 0)  // Valid pressure detected
+    {
+        lastX = p.x;
+        lastY = p.y;
         lastTouched = true;
+        
+        if (++diagnostic_count % 10 == 0) {
+            Serial.printf("[TOUCH_RAW] Count=%d X=%d Y=%d Z=%d\n", 
+                diagnostic_count, lastX, lastY, p.z);
+        }
+        
         return true;
     }
+    
+    lastTouched = false;
     return false;
 }
 
@@ -55,6 +81,12 @@ void Display::begin()
     digitalWrite(TFT_BL, HIGH);
     Serial.printf("%s Backlight initialized\n", TAG);
 
+    // XPT2046 touchscreen (TFT_eSPI already configured SPI)
+    Serial.printf("%s XPT2046 ready on pins: CS=%d, IRQ=%d\n", 
+        TAG, TOUCH_CS, TOUCH_IRQ);
+    Serial.printf("%s Touch calibration: X %d-%d, Y %d-%d\n", 
+        TAG, TOUCH_X_MIN, TOUCH_X_MAX, TOUCH_Y_MIN, TOUCH_Y_MAX);
+
     // Initialize LVGL
     lv_init();
     Serial.printf("%s LVGL initialized\n", TAG);
@@ -75,13 +107,12 @@ void Display::begin()
     lv_theme_t * th = lv_theme_default_init(lv_disp_get_default(), lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
     lv_disp_set_theme(lv_disp_get_default(), th);
 
-    // Setup LVGL input device for touchscreen (basic support)
+    // Setup LVGL input device for touchscreen
     lv_indev_drv_init(&indev_drv);
     indev_drv.type = LV_INDEV_TYPE_POINTER;
     indev_drv.read_cb = lvgl_touch_cb;
     indev = lv_indev_drv_register(&indev_drv);
-
-    Serial.printf("%s Touchscreen input setup complete\n", TAG);
+    Serial.printf("%s Touch input device registered\n", TAG);
 
     Serial.printf("%s Display initialization complete\n", TAG);
 }
@@ -125,19 +156,33 @@ static void lvgl_flush_cb(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t
 
 static void lvgl_touch_cb(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
-    if (readTouch()) {
-        // TFT_eSPI returns coordinates in screen space, but need to account for LVGL rotation
-        // For ROT_270, swap coordinates
-        data->point.x = lastY;  // Swapped due to rotation
-        data->point.y = lastX;  // Swapped due to rotation
+    static uint32_t callback_count = 0;
+    callback_count++;
+    
+    bool touched = readTouch();
+    
+    if (touched) {
+        // TFT_eSPI getTouch() returns raw ADC values (0-4095 range)
+        // Map to screen coordinates (0-319 x 0-239) using calibration constants
+        uint16_t mapped_x = map(lastX, TOUCH_X_MIN, TOUCH_X_MAX, 0, DISPLAY_WIDTH - 1);
+        uint16_t mapped_y = map(lastY, TOUCH_Y_MIN, TOUCH_Y_MAX, 0, DISPLAY_HEIGHT - 1);
+        
+        // Clamp to screen bounds
+        mapped_x = constrain(mapped_x, 0, DISPLAY_WIDTH - 1);
+        mapped_y = constrain(mapped_y, 0, DISPLAY_HEIGHT - 1);
+        
+        // Apply rotation transformation for LV_DISP_ROT_270 (270-degree landscape rotation)
+        // For 270-degree rotation: x_rotated = y, y_rotated = (width - 1 - x)
+        data->point.x = mapped_y;
+        data->point.y = (DISPLAY_WIDTH - 1) - mapped_x;
         data->state = LV_INDEV_STATE_PRESSED;
         
-        static uint32_t touch_count = 0;
-        if (touch_count++ % 5 == 0) {
-            Serial.printf("[TOUCH] Screen: X=%d Y=%d -> LVGL: X=%d Y=%d\n", 
-                lastX, lastY, data->point.x, data->point.y);
+        if (callback_count % 100 == 0) {
+            Serial.printf("[TOUCH_CB] Raw: X=%d Y=%d | Mapped: X=%d Y=%d | Final: X=%d Y=%d\n", 
+                lastX, lastY, mapped_x, mapped_y, data->point.x, data->point.y);
         }
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
+

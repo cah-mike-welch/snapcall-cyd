@@ -17,7 +17,7 @@ void setup()
     
     Display::begin();
     
-    // Connect to WiFi
+    // Connect to WiFi - try primary first, then secondary
     Serial.printf("%s Connecting to WiFi: %s\n", TAG, WIFI_SSID);
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -29,10 +29,25 @@ void setup()
         attempts++;
     }
     
+    // Try secondary WiFi if primary failed
+    if (WiFi.status() != WL_CONNECTED && WIFI_SSID_2[0] != '\0') {
+        Serial.printf("\n%s Primary WiFi failed. Trying secondary: %s\n", TAG, WIFI_SSID_2);
+        WiFi.disconnect();
+        delay(100);
+        WiFi.begin(WIFI_SSID_2, WIFI_PASSWORD_2);
+        
+        attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+    }
+    
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("\n%s WiFi connected! IP: %s\n", TAG, WiFi.localIP().toString().c_str());
     } else {
-        Serial.printf("\n%s WARNING: WiFi connection failed\n", TAG);
+        Serial.printf("\n%s WARNING: WiFi connection failed - continuing offline\n", TAG);
     }
     
     // Show club selection screen
