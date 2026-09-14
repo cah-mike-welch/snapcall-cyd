@@ -364,18 +364,18 @@ void setup()
     button1.width = BTN1_W;
     button1.height = BTN1_H;
     button1.color = TFT_BLUE;
-    strcpy(button1.label, "Button 1");
+    strcpy(button1.label, "Button A");
 
     button2.x = BTN2_X;
     button2.y = BTN2_Y;
     button2.width = BTN2_W;
     button2.height = BTN2_H;
     button2.color = TFT_RED;
-    strcpy(button2.label, "Button 2");
+    strcpy(button2.label, "Button B");
 
     // Print button boundaries for debugging
     Serial.println("\n=== Button Boundaries ===");
-    Serial.print("Button 1: X=");
+    Serial.print("Button A: X=");
     Serial.print(button1.x);
     Serial.print("-");
     Serial.print(button1.x + button1.width);
@@ -384,7 +384,7 @@ void setup()
     Serial.print("-");
     Serial.println(button1.y + button1.height);
 
-    Serial.print("Button 2: X=");
+    Serial.print("Button B: X=");
     Serial.print(button2.x);
     Serial.print("-");
     Serial.print(button2.x + button2.width);
@@ -449,7 +449,7 @@ void loop()
         boolean inButton1 = isPointInButton(p, button1);
         boolean inButton2 = isPointInButton(p, button2);
 
-        Serial.print("[CHECK] Button1 (X ");
+        Serial.print("[CHECK] Button A (X ");
         Serial.print(button1.x);
         Serial.print("-");
         Serial.print(button1.x + button1.width);
