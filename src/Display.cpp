@@ -6,6 +6,7 @@
 static const char *TAG = "[DISPLAY]";
 
 // XPT2046 Touchscreen instance
+// Using pins defined in User_Setup.h: CS=33, IRQ=36
 XPT2046_Touchscreen ts(TOUCH_CS, TOUCH_IRQ);
 
 // Calibration values for ESP32-2432S028
@@ -32,14 +33,14 @@ static uint32_t diagnostic_count = 0;
 
 static bool readTouch()
 {
-    // Check if touchscreen has new data via interrupt pin
-    if (!ts.tirqTouched())
+    // Check if screen is touched
+    if (!ts.touched())
     {
         lastTouched = false;
         return false;
     }
     
-    // Read coordinates via library
+    // Read coordinates from XPT2046
     TS_Point p = ts.getPoint();
     
     if (p.z > 0)  // Valid pressure detected
@@ -81,8 +82,13 @@ void Display::begin()
     digitalWrite(TFT_BL, HIGH);
     Serial.printf("%s Backlight initialized\n", TAG);
 
-    // XPT2046 touchscreen (TFT_eSPI already configured SPI)
-    Serial.printf("%s XPT2046 ready on pins: CS=%d, IRQ=%d\n", 
+    // Initialize touchscreen with proper SPI configuration
+    // XPT2046_Touchscreen will use pins defined in User_Setup.h
+    Serial.printf("%s Initializing XPT2046 touchscreen...\n", TAG);
+    ts.begin();
+    ts.setRotation(1);  // Match display rotation (1=landscape)
+    
+    Serial.printf("%s XPT2046 initialized on pins: CS=%d, IRQ=%d\n", 
         TAG, TOUCH_CS, TOUCH_IRQ);
     Serial.printf("%s Touch calibration: X %d-%d, Y %d-%d\n", 
         TAG, TOUCH_X_MIN, TOUCH_X_MAX, TOUCH_Y_MIN, TOUCH_Y_MAX);

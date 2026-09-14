@@ -6,8 +6,10 @@
 #ifndef _USER_SETUP_H_
 #define _USER_SETUP_H_
 
+#define USER_SETUP_INFO "User_Setup"
+
 // Driver selection
-#define ILI9341_DRIVER
+#define ILI9341_2_DRIVER
 
 // Display pins (SPI)
 #define TFT_MOSI 13
@@ -22,11 +24,11 @@
 #define TFT_BACKLIGHT_ON HIGH
 
 // Display resolution
-#define TFT_WIDTH  320
-#define TFT_HEIGHT 240
+#define TFT_WIDTH  240
+#define TFT_HEIGHT 320
 
 // Invert display
-#define TFT_INVERSION_ON
+//#define TFT_INVERSION_ON
 
 // Touch screen XPT2046
 #define TOUCH_CS 33
@@ -39,7 +41,7 @@
 #define TOUCH_SPI_PORT VSPI_HOST
 
 // SPI frequencies
-#define SPI_FREQUENCY       55000000  // Display SPI speed
+#define SPI_FREQUENCY       40000000  // Display SPI speed
 #define SPI_READ_FREQUENCY  20000000  // Read SPI speed  
 #define SPI_TOUCH_FREQUENCY 2500000   // Touch SPI speed (lower for stability)
 
