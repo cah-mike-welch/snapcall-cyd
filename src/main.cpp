@@ -1,505 +1,194 @@
-// Two Button Click Demo for ESP32-2432S028R
-// Displays two buttons and shows a message when clicked
-// Based on TouchTest.cpp
-
+// CYD LVGL + Touch Solution (ESP32-2432S028R)
 #include "Arduino.h"
+#include <lvgl.h>
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 #include <SPI.h>
+#include "esp_timer.h"
 
-// TFT Display Pins (also set via platformio.ini build_flags for TFT_eSPI)
+// Display Pins
 #define TFT_BL 21
+#define TFT_CS 15
 
-// Touch Screen Pins
+// Touch Pins
 #define XPT2046_IRQ 36
 #define XPT2046_MOSI 32
 #define XPT2046_MISO 39
 #define XPT2046_CLK 25
 #define XPT2046_CS 33
 
-// Calibration values for XPT2046 (raw ADC to screen coordinates)
-// Verified working values from serial log - see HARDWARE_NOTES.md
-uint16_t ts_minx = 489;
-uint16_t ts_miny = 283;
-uint16_t ts_maxx = 3772;
-uint16_t ts_maxy = 3713;
+// Dynamic values from your hardware test log
+const uint16_t ts_minx = 300;
+const uint16_t ts_maxx = 3800;
+const uint16_t ts_miny = 400;
+const uint16_t ts_maxy = 3800;
 
-// Set to 1 to run the interactive 4-point calibration routine at boot instead
-// of using the hardcoded values above (e.g. if you swap to a different unit)
-#define RUN_TOUCH_CALIBRATION 0
-
-// Display dimensions - physical panel renders portrait at rotation(0)
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 320
 
-// Button positions - stacked vertically for portrait, shared by calibration and setup
-const uint16_t BTN1_X = 20, BTN1_Y = 30, BTN1_W = 200, BTN1_H = 100;
-const uint16_t BTN2_X = 20, BTN2_Y = 160, BTN2_W = 200, BTN2_H = 100;
+static lv_disp_draw_buf_t draw_buf;
+static lv_color_t buf[SCREEN_WIDTH * 10];
+static lv_disp_drv_t disp_drv;
+static lv_indev_drv_t indev_drv;
 
-// Button structure
-struct Button
-{
-    uint16_t x, y, width, height;
-    uint16_t color;
-    char label[20];
-};
-
-// Initialize SPI instance for touch (display uses its own bus via TFT_eSPI)
-SPIClass vspi = SPIClass(VSPI);
-
-// Initialize touch and display
+// Separate HSPI instance specifically for touch pins
+SPIClass touchSpi = SPIClass(HSPI);
 XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
 TFT_eSPI tft = TFT_eSPI();
 
-// Button instances
-Button button1, button2;
+static lv_obj_t *label_status;
 
-// Function to calibrate touch coordinates to screen coordinates
-void calibrateTouch(TS_Point &p)
+static void lvgl_tick_cb(void *arg)
 {
-    // Map raw ADC values to screen coordinates
-    // In portrait mode: X should map to 0-240, Y should map to 0-320
-    uint16_t calibrated_x = map(p.x, ts_minx, ts_maxx, 0, SCREEN_WIDTH);
-    uint16_t calibrated_y = map(p.y, ts_miny, ts_maxy, 0, SCREEN_HEIGHT);
-
-    p.x = calibrated_x;
-    p.y = calibrated_y;
+    lv_tick_inc(1);
 }
 
-// Function to draw a button
-void drawButton(Button &btn)
+void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
-    tft.fillRect(btn.x, btn.y, btn.width, btn.height, btn.color);
-    tft.drawRect(btn.x, btn.y, btn.width, btn.height, TFT_BLACK);
+    uint32_t w = (area->x2 - area->x1 + 1);
+    uint32_t h = (area->y2 - area->y1 + 1);
 
-    // Draw button text, centered
-    tft.setTextSize(2);
-    tft.setTextColor(TFT_BLACK, btn.color);
-    tft.setTextDatum(MC_DATUM);
-    tft.drawString(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
-    tft.setTextDatum(TL_DATUM);
+    tft.startWrite();
+    tft.setAddrWindow(area->x1, area->y1, w, h);
+    tft.pushColors((uint16_t *)&color_p->full, w * h, true);
+    tft.endWrite();
+
+    lv_disp_flush_ready(disp_drv);
 }
 
-// Function to check if a point is within a button
-boolean isPointInButton(TS_Point p, Button &btn)
+void my_touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 {
-    return (p.x >= btn.x && p.x <= btn.x + btn.width &&
-            p.y >= btn.y && p.y <= btn.y + btn.height);
+    if (ts.touched())
+    {
+        TS_Point p = ts.getPoint();
+
+        // Map raw ADC reads to LVGL display resolution
+        int16_t x = map(p.x, ts_minx, ts_maxx, 0, SCREEN_WIDTH);
+        int16_t y = map(p.y, ts_miny, ts_maxy, 0, SCREEN_HEIGHT);
+
+        x = constrain(x, 0, SCREEN_WIDTH - 1);
+        y = constrain(y, 0, SCREEN_HEIGHT - 1);
+
+        data->state = LV_INDEV_STATE_PR;
+        data->point.x = x;
+        data->point.y = y;
+
+        Serial.printf("[LVGL TOUCH HIT] Raw X:%d Y:%d Z:%d -> Screen X:%d Y:%d\n", p.x, p.y, p.z, x, y);
+    }
+    else
+    {
+        data->state = LV_INDEV_STATE_REL;
+    }
 }
 
-// Function to display a message on screen
-void displayMessage(const char *msg, uint16_t color)
+static void btn_event_cb(lv_event_t *e)
 {
-    // Clear the message area at bottom of the screen
-    tft.fillRect(0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30, TFT_BLACK);
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *btn = lv_event_get_target(e);
 
-    // Display the message
-    tft.setTextSize(1);
-    tft.setTextColor(color, TFT_BLACK);
-    tft.setCursor(5, SCREEN_HEIGHT - 20);
-    tft.print(msg);
+    if (code == LV_EVENT_CLICKED)
+    {
+        lv_obj_t *label = lv_obj_get_child(btn, 0);
+        const char *txt = lv_label_get_text(label);
+
+        Serial.printf("[LVGL EVENT] Clicked: %s\n", txt);
+
+        char status_buf[32];
+        snprintf(status_buf, sizeof(status_buf), "%s Clicked!", txt);
+        lv_label_set_text(label_status, status_buf);
+        lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
+    }
 }
 
-// Calibration routine - 4-point calibration: corners + button centers
-void calibrationRoutine()
+void create_ui()
 {
-    uint16_t cal_minx = 4095, cal_miny = 4095;
-    uint16_t cal_maxx = 0, cal_maxy = 0;
-    TS_Point p1_center, p2_center;
+    lv_obj_t *title = lv_label_create(lv_scr_act());
+    lv_label_set_text(title, "CYD Touch Working!");
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
 
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_WHITE);
-    tft.setCursor(10, 10);
-    tft.print("4-POINT CALIBRATION");
-    tft.setCursor(10, 30);
-    tft.print("Display: 240w x 320h");
-    delay(1500);
+    // Button A
+    lv_obj_t *btn1 = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(btn1, 200, 70);
+    lv_obj_align(btn1, LV_ALIGN_TOP_MID, 0, 40);
+    lv_obj_set_style_bg_color(btn1, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_add_event_cb(btn1, btn_event_cb, LV_EVENT_CLICKED, NULL);
 
-    // Point 1: Top-left corner
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(5, 50);
-    tft.print("Touch");
-    tft.setCursor(5, 80);
-    tft.print("TOP-LEFT");
-    tft.setTextSize(1);
-    tft.setCursor(5, 120);
-    tft.print("Point 1 of 4");
-    tft.drawRect(5, 5, 20, 20, TFT_YELLOW);
+    lv_obj_t *btn1_label = lv_label_create(btn1);
+    lv_label_set_text(btn1_label, "Button A");
+    lv_obj_center(btn1_label);
 
-    boolean touched = false;
-    while (!touched)
-    {
-        if (ts.touched())
-        {
-            TS_Point p = ts.getPoint();
-            cal_minx = min(cal_minx, (uint16_t)p.x);
-            cal_miny = min(cal_miny, (uint16_t)p.y);
-            Serial.print("[CAL P1] TL: X=");
-            Serial.print(p.x);
-            Serial.print(", Y=");
-            Serial.println(p.y);
-            touched = true;
-            delay(500);
-        }
-    }
+    // Button B
+    lv_obj_t *btn2 = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(btn2, 200, 70);
+    lv_obj_align(btn2, LV_ALIGN_TOP_MID, 0, 130);
+    lv_obj_set_style_bg_color(btn2, lv_palette_main(LV_PALETTE_RED), 0);
+    lv_obj_add_event_cb(btn2, btn_event_cb, LV_EVENT_CLICKED, NULL);
 
-    // Point 2: Bottom-right corner
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(5, 50);
-    tft.print("Touch");
-    tft.setCursor(5, 80);
-    tft.print("BOTTOM-RIGHT");
-    tft.setTextSize(1);
-    tft.setCursor(5, 120);
-    tft.print("Point 2 of 4");
-    tft.drawRect(SCREEN_WIDTH - 25, SCREEN_HEIGHT - 25, 20, 20, TFT_YELLOW);
+    lv_obj_t *btn2_label = lv_label_create(btn2);
+    lv_label_set_text(btn2_label, "Button B");
+    lv_obj_center(btn2_label);
 
-    touched = false;
-    while (!touched)
-    {
-        if (ts.touched())
-        {
-            TS_Point p = ts.getPoint();
-            cal_maxx = max(cal_maxx, (uint16_t)p.x);
-            cal_maxy = max(cal_maxy, (uint16_t)p.y);
-            Serial.print("[CAL P2] BR: X=");
-            Serial.print(p.x);
-            Serial.print(", Y=");
-            Serial.println(p.y);
-            touched = true;
-            delay(500);
-        }
-    }
-
-    // Point 3: Button 1 center (should be near top center)
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(5, 50);
-    tft.print("Touch");
-    tft.setCursor(5, 80);
-    tft.print("Button 1");
-    tft.setTextSize(1);
-    tft.setCursor(5, 120);
-    tft.print("Point 3 of 4");
-    tft.drawRect(BTN1_X + BTN1_W / 2 - 15, BTN1_Y + BTN1_H / 2 - 15, 30, 30, TFT_GREEN);
-
-    touched = false;
-    while (!touched)
-    {
-        if (ts.touched())
-        {
-            p1_center = ts.getPoint();
-            Serial.print("[CAL P3] B1: X=");
-            Serial.print(p1_center.x);
-            Serial.print(", Y=");
-            Serial.println(p1_center.y);
-            touched = true;
-            delay(500);
-        }
-    }
-
-    // Point 4: Button 2 center (should be near bottom center)
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(2);
-    tft.setCursor(5, 50);
-    tft.print("Touch");
-    tft.setCursor(5, 80);
-    tft.print("Button 2");
-    tft.setTextSize(1);
-    tft.setCursor(5, 120);
-    tft.print("Point 4 of 4");
-    tft.drawRect(BTN2_X + BTN2_W / 2 - 15, BTN2_Y + BTN2_H / 2 - 15, 30, 30, TFT_GREEN);
-
-    touched = false;
-    while (!touched)
-    {
-        if (ts.touched())
-        {
-            p2_center = ts.getPoint();
-            Serial.print("[CAL P4] B2: X=");
-            Serial.print(p2_center.x);
-            Serial.print(", Y=");
-            Serial.println(p2_center.y);
-            touched = true;
-            delay(500);
-        }
-    }
-
-    // Store calibration values
-    ts_minx = cal_minx;
-    ts_miny = cal_miny;
-    ts_maxx = cal_maxx;
-    ts_maxy = cal_maxy;
-
-    // Check if Y-axis is inverted (common with XPT2046)
-    if (ts_miny > ts_maxy)
-    {
-        // Swap them
-        uint16_t temp = ts_miny;
-        ts_miny = ts_maxy;
-        ts_maxy = temp;
-        Serial.println("[INFO] Y-axis was inverted - swapped MINY/MAXY");
-    }
-
-    // Display calibration results
-    tft.fillScreen(TFT_BLACK);
-    tft.setTextSize(1);
-    tft.setTextColor(TFT_GREEN);
-    tft.setCursor(5, 10);
-    tft.print("CALIBRATION COMPLETE");
-    tft.setCursor(5, 30);
-    tft.print("MinX:");
-    tft.print(ts_minx);
-    tft.print(" MaxX:");
-    tft.println(ts_maxx);
-    tft.setCursor(5, 50);
-    tft.print("MinY:");
-    tft.print(ts_miny);
-    tft.print(" MaxY:");
-    tft.println(ts_maxy);
-    tft.setCursor(5, 70);
-    tft.print("X range:");
-    tft.println(ts_maxx - ts_minx);
-    tft.setCursor(5, 90);
-    tft.print("Y range:");
-    tft.println(ts_maxy - ts_miny);
-    tft.setCursor(5, 120);
-    tft.print("B1 raw: X=");
-    tft.print(p1_center.x);
-    tft.print(" Y=");
-    tft.println(p1_center.y);
-    tft.setCursor(5, 140);
-    tft.print("B2 raw: X=");
-    tft.print(p2_center.x);
-    tft.print(" Y=");
-    tft.println(p2_center.y);
-
-    Serial.println("\n=== CALIBRATION COMPLETE ===");
-    Serial.print("TS_MINX = ");
-    Serial.println(ts_minx);
-    Serial.print("TS_MAXX = ");
-    Serial.println(ts_maxx);
-    Serial.print("TS_MINY = ");
-    Serial.println(ts_miny);
-    Serial.print("TS_MAXY = ");
-    Serial.println(ts_maxy);
-    Serial.print("X range: ");
-    Serial.print(ts_maxx - ts_minx);
-    Serial.print(", Y range: ");
-    Serial.println(ts_maxy - ts_miny);
-    Serial.print("Button 1 center (raw): X=");
-    Serial.print(p1_center.x);
-    Serial.print(", Y=");
-    Serial.println(p1_center.y);
-    Serial.print("Button 2 center (raw): X=");
-    Serial.print(p2_center.x);
-    Serial.print(", Y=");
-    Serial.println(p2_center.y);
-
-    delay(3000);
+    // Status Label
+    label_status = lv_label_create(lv_scr_act());
+    lv_label_set_text(label_status, "Awaiting touch input...");
+    lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREY), 0);
+    lv_obj_align(label_status, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 }
 
 void setup()
 {
-    Serial.begin(38400);
+    Serial.begin(115200);
+    delay(500);
 
-    // Initialize backlight
+    Serial.println("\n--- Initializing CYD LVGL + Touch ---");
+
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
 
-    // Initialize TFT display
+    pinMode(XPT2046_IRQ, INPUT_PULLUP);
+
+    // 1. Initialize Display
     tft.init();
-    tft.setRotation(0); // Physical panel renders landscape at rotation(0)
-    tft.fillScreen(TFT_BLACK);
+    tft.setRotation(0);
 
-    // Wait for serial if needed
-    while (!Serial && (millis() <= 1000))
-        ;
+    // 2. Initialize Dedicated Touch SPI Bus
+    touchSpi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
+    ts.begin(touchSpi);
+    ts.setRotation(0);
 
-    // DIAGNOSTIC: solid color fills only, no app logic, to isolate hardware vs software noise
-    Serial.println("\n=== DIAGNOSTIC: solid fill test ===");
-    Serial.print("tft.width()=");
-    Serial.print(tft.width());
-    Serial.print(" tft.height()=");
-    Serial.println(tft.height());
-    tft.fillScreen(TFT_RED);
-    Serial.println("Filled RED - check for noise, then waiting 3s...");
-    delay(3000);
-    tft.fillScreen(TFT_GREEN);
-    Serial.println("Filled GREEN - check for noise, then waiting 3s...");
-    delay(3000);
-    tft.fillScreen(TFT_BLACK);
-    Serial.println("Filled BLACK - diagnostic done.");
-    delay(1000);
+    // 3. Initialize LVGL Engine
+    lv_init();
 
-    // Setup touch screen on VSPI
-    vspi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
-    ts.begin(vspi);
-    ts.setRotation(0); // Portrait mode to match display
+    const esp_timer_create_args_t lvgl_tick_timer_args = {
+        .callback = &lvgl_tick_cb,
+        .name = "lvgl_tick"};
+    esp_timer_handle_t lvgl_tick_timer = NULL;
+    esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer);
+    esp_timer_start_periodic(lvgl_tick_timer, 1000);
 
-    Serial.println("\nStarting Calibration Routine...");
-    Serial.println("You will be asked to touch the top-left and bottom-right corners.");
+    lv_disp_draw_buf_init(&draw_buf, buf, NULL, SCREEN_WIDTH * 10);
 
-    // Run calibration
-#if RUN_TOUCH_CALIBRATION
-    calibrationRoutine();
-#else
-    Serial.println("Skipping interactive calibration - using hardcoded values:");
-    Serial.print("TS_MINX=");
-    Serial.print(ts_minx);
-    Serial.print(" TS_MAXX=");
-    Serial.print(ts_maxx);
-    Serial.print(" TS_MINY=");
-    Serial.print(ts_miny);
-    Serial.print(" TS_MAXY=");
-    Serial.println(ts_maxy);
-#endif
+    // Display Driver Registration
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res = SCREEN_WIDTH;
+    disp_drv.ver_res = SCREEN_HEIGHT;
+    disp_drv.flush_cb = my_disp_flush;
+    disp_drv.draw_buf = &draw_buf;
+    lv_disp_drv_register(&disp_drv);
 
-    // Initialize buttons - stacked vertically for portrait mode (240 wide x 320 tall)
-    button1.x = BTN1_X;
-    button1.y = BTN1_Y;
-    button1.width = BTN1_W;
-    button1.height = BTN1_H;
-    button1.color = TFT_BLUE;
-    strcpy(button1.label, "Button A");
+    // Input Driver Registration
+    lv_indev_drv_init(&indev_drv);
+    indev_drv.type = LV_INDEV_TYPE_POINTER;
+    indev_drv.read_cb = my_touchpad_read;
+    lv_indev_drv_register(&indev_drv);
 
-    button2.x = BTN2_X;
-    button2.y = BTN2_Y;
-    button2.width = BTN2_W;
-    button2.height = BTN2_H;
-    button2.color = TFT_RED;
-    strcpy(button2.label, "Button B");
+    create_ui();
 
-    // Print button boundaries for debugging
-    Serial.println("\n=== Button Boundaries ===");
-    Serial.print("Button A: X=");
-    Serial.print(button1.x);
-    Serial.print("-");
-    Serial.print(button1.x + button1.width);
-    Serial.print(", Y=");
-    Serial.print(button1.y);
-    Serial.print("-");
-    Serial.println(button1.y + button1.height);
-
-    Serial.print("Button B: X=");
-    Serial.print(button2.x);
-    Serial.print("-");
-    Serial.print(button2.x + button2.width);
-    Serial.print(", Y=");
-    Serial.print(button2.y);
-    Serial.print("-");
-    Serial.println(button2.y + button2.height);
-    Serial.print("Screen dimensions: ");
-    Serial.print(SCREEN_WIDTH);
-    Serial.print("x");
-    Serial.println(SCREEN_HEIGHT);
-    tft.fillScreen(TFT_BLACK);
-
-    tft.setTextSize(2);
-    tft.setTextColor(TFT_WHITE);
-    tft.setCursor(80, 10);
-    tft.print("Touch Demo");
-
-    drawButton(button1);
-    drawButton(button2);
-
-    displayMessage("Touch a button", TFT_GREEN);
-
-    Serial.println("Setup complete. Touch a button!");
+    Serial.println("[SYSTEM] Setup complete.");
 }
 
 void loop()
 {
-    if (ts.touched())
-    {
-        // Get raw touch point
-        TS_Point rawPoint = ts.getPoint();
-        TS_Point p = rawPoint;
-
-        // Print raw coordinates before calibration
-        Serial.print("\n[RAW] X: ");
-        Serial.print(rawPoint.x);
-        Serial.print(", Y: ");
-        Serial.println(rawPoint.y);
-
-        // Calibrate to screen coordinates
-        calibrateTouch(p);
-
-        // Print calibrated coordinates
-        Serial.print("[CAL] X: ");
-        Serial.print(p.x);
-        Serial.print(", Y: ");
-        Serial.print(p.y);
-
-        // Check if coordinates are within valid screen bounds
-        if (p.x > SCREEN_WIDTH)
-        {
-            Serial.print(" [X OUT OF BOUNDS!]");
-        }
-        if (p.y > SCREEN_HEIGHT)
-        {
-            Serial.print(" [Y OUT OF BOUNDS!]");
-        }
-        Serial.println();
-
-        // Check which button was pressed
-        boolean inButton1 = isPointInButton(p, button1);
-        boolean inButton2 = isPointInButton(p, button2);
-
-        Serial.print("[CHECK] Button A (X ");
-        Serial.print(button1.x);
-        Serial.print("-");
-        Serial.print(button1.x + button1.width);
-        Serial.print(", Y ");
-        Serial.print(button1.y);
-        Serial.print("-");
-        Serial.print(button1.y + button1.height);
-        Serial.print(") -> ");
-        Serial.println(inButton1 ? "HIT" : "MISS");
-
-        Serial.print("[CHECK] Button2 (X ");
-        Serial.print(button2.x);
-        Serial.print("-");
-        Serial.print(button2.x + button2.width);
-        Serial.print(", Y ");
-        Serial.print(button2.y);
-        Serial.print("-");
-        Serial.print(button2.y + button2.height);
-        Serial.print(") -> ");
-        Serial.println(inButton2 ? "HIT" : "MISS");
-
-        if (inButton1)
-        {
-            displayMessage("Button 1!", TFT_GREEN);
-            Serial.println(">>> BUTTON 1 ACTIVATED <<<");
-
-            // Visual feedback
-            tft.fillRect(button1.x, button1.y, button1.width, button1.height, TFT_CYAN);
-            delay(200);
-            drawButton(button1);
-        }
-        else if (inButton2)
-        {
-            displayMessage("Button 2!", TFT_GREEN);
-            Serial.println(">>> BUTTON 2 ACTIVATED <<<");
-
-            // Visual feedback
-            tft.fillRect(button2.x, button2.y, button2.width, button2.height, TFT_CYAN);
-            delay(200);
-            drawButton(button2);
-        }
-        else
-        {
-            Serial.print("[NO BUTTON HIT] Touch was at screen coords: X=");
-            Serial.print(p.x);
-            Serial.print(", Y=");
-            Serial.println(p.y);
-        }
-
-        // Wait for touch release
-        delay(300);
-    }
+    lv_timer_handler();
+    delay(5);
 }
