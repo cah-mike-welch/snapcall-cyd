@@ -73,6 +73,13 @@ WiFiMulti wifiMulti;
 static lv_obj_t *label_status;
 static lv_obj_t *label_wifi;
 
+// Helper to set screen background to black
+void set_dark_background()
+{
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, 0);
+}
+
 // ==========================================
 // HARDWARE / DISPLAY CALLBACKS
 // ==========================================
@@ -118,25 +125,32 @@ void my_touchpad_read(lv_indev_drv_t *drv, lv_indev_data_t *data)
 // Builds the static text elements (WiFi IP and Status bar)
 void create_base_ui()
 {
+    set_dark_background();
+
     label_wifi = lv_label_create(lv_scr_act());
+
+    // Set font size 14 explicitly for Wi-Fi info
+    lv_obj_set_style_text_font(label_wifi, &lv_font_montserrat_14, 0);
+
     if (WiFi.status() == WL_CONNECTED)
     {
         String wifiInfo = "WiFi: Connected\nIP: " + WiFi.localIP().toString();
         lv_label_set_text(label_wifi, wifiInfo.c_str());
-        lv_obj_set_style_text_color(label_wifi, lv_palette_main(LV_PALETTE_GREEN), 0);
     }
     else
     {
         lv_label_set_text(label_wifi, "WiFi Disconnected");
-        lv_obj_set_style_text_color(label_wifi, lv_palette_main(LV_PALETTE_RED), 0);
     }
+
+    // White text color for Wi-Fi details
+    lv_obj_set_style_text_color(label_wifi, lv_color_white(), 0);
 
     lv_obj_set_style_text_align(label_wifi, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label_wifi, LV_ALIGN_TOP_MID, 0, 5);
 
     label_status = lv_label_create(lv_scr_act());
     lv_label_set_text(label_status, "Fetching data...");
-    lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_BLUE), 0);
+    lv_obj_set_style_text_color(label_status, lv_color_white(), 0);
     lv_obj_align(label_status, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 }
 
@@ -151,18 +165,17 @@ String format_blind_value(int val)
     }
     else
     {
-        // If it's a clean thousand (e.g., 1000 -> 1K, 5000 -> 5K)
         if (val % 1000 == 0)
         {
             return String(val / 1000) + "K";
         }
         else
         {
-            // Include 1 decimal place (e.g., 1200 -> 1.2K)
             return String(val / 1000.0, 1) + "K";
         }
     }
 }
+
 void fetch_blinds_and_build_ui()
 {
     if (WiFi.status() != WL_CONNECTED)
@@ -171,14 +184,10 @@ void fetch_blinds_and_build_ui()
         return;
     }
 
-    // Clear the screen completely (removes the IP address header)
     lv_obj_clean(lv_scr_act());
+    set_dark_background();
 
-    // Create ONLY the status label at the bottom showing "Blinds Live."
-    label_status = lv_label_create(lv_scr_act());
-    lv_label_set_text(label_status, "Blinds Live.");
-    lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
-    lv_obj_align(label_status, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+    // Note: "Blinds Live." status label has been removed from this screen entirely.
 
     WiFiClientSecure client;
     client.setInsecure();
@@ -223,51 +232,49 @@ void fetch_blinds_and_build_ui()
                 char title_buf[64];
                 snprintf(title_buf, sizeof(title_buf), "Table %d Blinds", selected_table_number);
                 lv_label_set_text(title_label, title_buf);
+                lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
                 lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 15);
 
                 // 2. Main Blinds String (e.g., 100-200)
                 String blinds_text = format_blind_value(sb) + "-" + format_blind_value(bb);
                 lv_obj_t *blinds_label = lv_label_create(lv_scr_act());
                 lv_label_set_text(blinds_label, blinds_text.c_str());
-                lv_obj_set_style_text_color(blinds_label, lv_palette_main(LV_PALETTE_NONE), 0);
+                lv_obj_set_style_text_color(blinds_label, lv_color_white(), 0);
                 lv_obj_set_style_text_font(blinds_label, &lv_font_montserrat_48, 0);
 
                 // 3. Conditional Layout based on Big Blind Ante
                 if (bba > 0)
                 {
-                    // Place main blinds slightly higher to make room for ante line
-                    lv_obj_align(blinds_label, LV_ALIGN_TOP_MID, 0, 55);
+                    lv_obj_align(blinds_label, LV_ALIGN_TOP_MID, 0, 50);
 
-                    // Ante line below blinds (e.g., "200 BB ante")
+                    // Ante line below blinds using smaller font (montserrat_28)
                     String ante_text = format_blind_value(bba) + " BB ante";
                     lv_obj_t *ante_label = lv_label_create(lv_scr_act());
                     lv_label_set_text(ante_label, ante_text.c_str());
-                    lv_obj_set_style_text_color(ante_label, lv_palette_main(LV_PALETTE_NONE), 0);
+                    lv_obj_set_style_text_color(ante_label, lv_color_white(), 0);
                     lv_obj_set_style_text_font(ante_label, &lv_font_montserrat_28, 0);
-                    lv_obj_align(ante_label, LV_ALIGN_TOP_MID, 0, 120);
+                    lv_obj_align(ante_label, LV_ALIGN_TOP_MID, 0, 115);
                 }
                 else
                 {
-                    // Center blinds if no ante is present
                     lv_obj_align(blinds_label, LV_ALIGN_CENTER, 0, -20);
                 }
 
                 // 4. Time Remaining String (Large font near bottom)
                 lv_obj_t *time_label = lv_label_create(lv_scr_act());
                 lv_label_set_text(time_label, time_rem);
+                lv_obj_set_style_text_color(time_label, lv_color_white(), 0);
                 lv_obj_set_style_text_font(time_label, &lv_font_montserrat_48, 0);
                 lv_obj_align(time_label, LV_ALIGN_BOTTOM_MID, 0, -40);
             }
             else
             {
                 Serial.println("[API] JSON Parse failed for blinds");
-                lv_label_set_text(label_status, "Parse Error");
             }
         }
         else
         {
             Serial.printf("[API] GET blinds failed, code: %d\n", httpCode);
-            lv_label_set_text(label_status, "API Error");
         }
         http.end();
     }
@@ -296,18 +303,11 @@ static void table_btn_event_cb(lv_event_t *e)
             Serial.printf("Table ID: %d\n", selected_table_id);
             Serial.printf("Table Number: %d\n", selected_table_number);
 
-            char status_buf[64];
-            snprintf(status_buf, sizeof(status_buf), "Table %d Selected", data->table_number);
-            lv_label_set_text(label_status, status_buf);
-            lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
-
-            // Fetch the blinds for the current tournament and update the screen
             fetch_blinds_and_build_ui();
         }
     }
 }
 
-// Makes the API call and dynamically generates table buttons
 void fetch_tables_and_build_buttons()
 {
     if (WiFi.status() != WL_CONNECTED)
@@ -316,9 +316,7 @@ void fetch_tables_and_build_buttons()
         return;
     }
 
-    // 1. Clear the screen of the previous club buttons
     lv_obj_clean(lv_scr_act());
-    // Re-draw the static header/footer
     create_base_ui();
 
     lv_label_set_text(label_status, "Fetching tables...");
@@ -331,7 +329,6 @@ void fetch_tables_and_build_buttons()
     http.setTimeout(15000);
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
-    // 2. Build the dynamic URL using the selected_club_id
     char table_api_url[128];
     snprintf(table_api_url, sizeof(table_api_url), "https://snapcallapp.com/api/device/v1/clubs/%d/current-tournament", selected_club_id);
 
@@ -354,7 +351,6 @@ void fetch_tables_and_build_buttons()
 
             if (!error && doc["success"] == true)
             {
-
                 int tourney_id = doc["data"]["tournament"]["id"] | 0;
                 const char *tourney_name = doc["data"]["tournament"]["name"] | "Current Tournament";
 
@@ -362,6 +358,7 @@ void fetch_tables_and_build_buttons()
                 char title_buf[64];
                 snprintf(title_buf, sizeof(title_buf), "%s - Select Table", tourney_name);
                 lv_label_set_text(title_label, title_buf);
+                lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
                 lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 40);
 
                 JsonArray tables = doc["data"]["tournament"]["tables"];
@@ -377,7 +374,9 @@ void fetch_tables_and_build_buttons()
                     lv_obj_t *btn = lv_btn_create(lv_scr_act());
                     lv_obj_set_size(btn, 200, 60);
                     lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, y_offset);
-                    lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_ORANGE), 0);
+                    lv_obj_set_style_bg_color(btn, lv_color_hex(0x222222), 0);
+                    lv_obj_set_style_border_color(btn, lv_color_white(), 0);
+                    lv_obj_set_style_border_width(btn, 1, 0);
 
                     lv_obj_add_event_cb(btn, table_btn_event_cb, LV_EVENT_CLICKED, tableData);
 
@@ -385,13 +384,14 @@ void fetch_tables_and_build_buttons()
                     char btn_text[32];
                     snprintf(btn_text, sizeof(btn_text), "Table %d", tableData->table_number);
                     lv_label_set_text(btn_label, btn_text);
+                    lv_obj_set_style_text_color(btn_label, lv_color_white(), 0);
                     lv_obj_center(btn_label);
 
                     y_offset += 70;
                 }
 
                 lv_label_set_text(label_status, "Select a table.");
-                lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREY), 0);
+                lv_obj_set_style_text_color(label_status, lv_color_white(), 0);
             }
             else
             {
@@ -411,7 +411,6 @@ void fetch_tables_and_build_buttons()
 // ==========================================
 // CLUB FUNCTIONS
 // ==========================================
-// Universal button click handler for clubs
 static void btn_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
@@ -434,15 +433,13 @@ static void btn_event_cb(lv_event_t *e)
             char status_buf[64];
             snprintf(status_buf, sizeof(status_buf), "Active: %s", data->short_name);
             lv_label_set_text(label_status, status_buf);
-            lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
+            lv_obj_set_style_text_color(label_status, lv_color_white(), 0);
 
-            // Fetch the tables for this club and rebuild the UI
             fetch_tables_and_build_buttons();
         }
     }
 }
 
-// Fetch clubs and dynamically generate buttons
 void fetch_clubs_and_build_buttons()
 {
     if (WiFi.status() != WL_CONNECTED)
@@ -477,6 +474,7 @@ void fetch_clubs_and_build_buttons()
             {
                 lv_obj_t *title_label = lv_label_create(lv_scr_act());
                 lv_label_set_text(title_label, "Select a Club");
+                lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
                 lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 40);
 
                 JsonArray clubs = doc["data"]["clubs"];
@@ -492,17 +490,21 @@ void fetch_clubs_and_build_buttons()
                     lv_obj_t *btn = lv_btn_create(lv_scr_act());
                     lv_obj_set_size(btn, 200, 60);
                     lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, y_offset);
-                    lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_BLUE), 0);
+                    lv_obj_set_style_bg_color(btn, lv_color_hex(0x222222), 0);
+                    lv_obj_set_style_border_color(btn, lv_color_white(), 0);
+                    lv_obj_set_style_border_width(btn, 1, 0);
 
                     lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, clubData);
 
                     lv_obj_t *btn_label = lv_label_create(btn);
                     lv_label_set_text(btn_label, clubData->short_name);
+                    lv_obj_set_style_text_color(btn_label, lv_color_white(), 0);
                     lv_obj_center(btn_label);
 
                     y_offset += 70;
                 }
                 lv_label_set_text(label_status, "Ready.");
+                lv_obj_set_style_text_color(label_status, lv_color_white(), 0);
             }
         }
         http.end();
@@ -564,10 +566,7 @@ void setup()
     indev_drv.read_cb = my_touchpad_read;
     lv_indev_drv_register(&indev_drv);
 
-    // Build the static UI elements first
     create_base_ui();
-
-    // Call the API and populate the dynamic buttons
     fetch_clubs_and_build_buttons();
 
     Serial.println("[SYSTEM] Setup complete.");
