@@ -141,8 +141,142 @@ void create_base_ui()
 }
 
 // ==========================================
+// BLINDS FUNCTIONS
+// ==========================================
+String format_blind_value(int val)
+{
+    if (val < 1000)
+    {
+        return String(val);
+    }
+    else
+    {
+        // If it's a clean thousand (e.g., 1000 -> 1K, 5000 -> 5K)
+        if (val % 1000 == 0)
+        {
+            return String(val / 1000) + "K";
+        }
+        else
+        {
+            // Include 1 decimal place (e.g., 1200 -> 1.2K)
+            return String(val / 1000.0, 1) + "K";
+        }
+    }
+}
+void fetch_blinds_and_build_ui()
+{
+    if (WiFi.status() != WL_CONNECTED)
+    {
+        lv_label_set_text(label_status, "Error: No WiFi");
+        return;
+    }
+
+    // Clear the screen completely (removes the IP address header)
+    lv_obj_clean(lv_scr_act());
+
+    // Create ONLY the status label at the bottom showing "Blinds Live."
+    label_status = lv_label_create(lv_scr_act());
+    lv_label_set_text(label_status, "Blinds Live.");
+    lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
+    lv_obj_align(label_status, LV_ALIGN_BOTTOM_LEFT, 10, -10);
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(15);
+
+    HTTPClient http;
+    http.setTimeout(15000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    char blinds_api_url[128];
+    snprintf(blinds_api_url, sizeof(blinds_api_url), "https://snapcallapp.com/api/device/v1/clubs/%d/current-blinds", selected_club_id);
+
+    Serial.printf("[API] Fetching blinds from: %s\n", blinds_api_url);
+
+    if (http.begin(client, blinds_api_url))
+    {
+        http.addHeader("Authorization", String("Bearer ") + BEARER_TOKEN);
+        http.addHeader("Accept", "application/json");
+        http.addHeader("User-Agent", "ESP32-CYD");
+
+        int httpCode = http.GET();
+
+        if (httpCode == HTTP_CODE_OK)
+        {
+            String payload = http.getString();
+            JsonDocument doc;
+            DeserializationError error = deserializeJson(doc, payload);
+
+            if (!error && doc["success"] == true)
+            {
+                const char *sb_str = doc["data"]["small_blind"] | "0";
+                const char *bb_str = doc["data"]["big_blind"] | "0";
+                const char *bba_str = doc["data"]["big_blind_ante"] | "0";
+                const char *time_rem = doc["data"]["time_remaining"] | "00:00";
+
+                int sb = atoi(sb_str);
+                int bb = atoi(bb_str);
+                int bba = atoi(bba_str);
+
+                // 1. Title Label (Table Number)
+                lv_obj_t *title_label = lv_label_create(lv_scr_act());
+                char title_buf[64];
+                snprintf(title_buf, sizeof(title_buf), "Table %d Blinds", selected_table_number);
+                lv_label_set_text(title_label, title_buf);
+                lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 15);
+
+                // 2. Main Blinds String (e.g., 100-200)
+                String blinds_text = format_blind_value(sb) + "-" + format_blind_value(bb);
+                lv_obj_t *blinds_label = lv_label_create(lv_scr_act());
+                lv_label_set_text(blinds_label, blinds_text.c_str());
+                lv_obj_set_style_text_color(blinds_label, lv_palette_main(LV_PALETTE_NONE), 0);
+                lv_obj_set_style_text_font(blinds_label, &lv_font_montserrat_48, 0);
+
+                // 3. Conditional Layout based on Big Blind Ante
+                if (bba > 0)
+                {
+                    // Place main blinds slightly higher to make room for ante line
+                    lv_obj_align(blinds_label, LV_ALIGN_TOP_MID, 0, 55);
+
+                    // Ante line below blinds (e.g., "200 BB ante")
+                    String ante_text = format_blind_value(bba) + " BB ante";
+                    lv_obj_t *ante_label = lv_label_create(lv_scr_act());
+                    lv_label_set_text(ante_label, ante_text.c_str());
+                    lv_obj_set_style_text_color(ante_label, lv_palette_main(LV_PALETTE_NONE), 0);
+                    lv_obj_set_style_text_font(ante_label, &lv_font_montserrat_28, 0);
+                    lv_obj_align(ante_label, LV_ALIGN_TOP_MID, 0, 120);
+                }
+                else
+                {
+                    // Center blinds if no ante is present
+                    lv_obj_align(blinds_label, LV_ALIGN_CENTER, 0, -20);
+                }
+
+                // 4. Time Remaining String (Large font near bottom)
+                lv_obj_t *time_label = lv_label_create(lv_scr_act());
+                lv_label_set_text(time_label, time_rem);
+                lv_obj_set_style_text_font(time_label, &lv_font_montserrat_48, 0);
+                lv_obj_align(time_label, LV_ALIGN_BOTTOM_MID, 0, -40);
+            }
+            else
+            {
+                Serial.println("[API] JSON Parse failed for blinds");
+                lv_label_set_text(label_status, "Parse Error");
+            }
+        }
+        else
+        {
+            Serial.printf("[API] GET blinds failed, code: %d\n", httpCode);
+            lv_label_set_text(label_status, "API Error");
+        }
+        http.end();
+    }
+}
+
+// ==========================================
 // TABLE FUNCTIONS
 // ==========================================
+
 static void table_btn_event_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
@@ -167,7 +301,8 @@ static void table_btn_event_cb(lv_event_t *e)
             lv_label_set_text(label_status, status_buf);
             lv_obj_set_style_text_color(label_status, lv_palette_main(LV_PALETTE_GREEN), 0);
 
-            // TODO: Trigger your next screen/API call here!
+            // Fetch the blinds for the current tournament and update the screen
+            fetch_blinds_and_build_ui();
         }
     }
 }
