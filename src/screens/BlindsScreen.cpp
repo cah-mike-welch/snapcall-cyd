@@ -1,0 +1,46 @@
+#include "BlindsScreen.h"
+
+#include <lvgl.h>
+
+void BlindsScreen::show(const Blinds &blinds, int tableNumber)
+{
+    // 1. Title Label (Table Number)
+    lv_obj_t *title_label = lv_label_create(lv_scr_act());
+    char title_buf[64];
+    snprintf(title_buf, sizeof(title_buf), "Table %d Blinds", tableNumber);
+    lv_label_set_text(title_label, title_buf);
+    lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 15);
+
+    // 2. Main Blinds String (e.g., 100-200)
+    String blinds_text = formatBlindValue(blinds.smallBlind) + "-" + formatBlindValue(blinds.bigBlind);
+    lv_obj_t *blinds_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(blinds_label, blinds_text.c_str());
+    lv_obj_set_style_text_color(blinds_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(blinds_label, &lv_font_montserrat_48, 0);
+
+    // 3. Conditional Layout based on Big Blind Ante
+    if (blinds.bigBlindAnte > 0)
+    {
+        lv_obj_align(blinds_label, LV_ALIGN_TOP_MID, 0, 50);
+
+        // Ante line below blinds using smaller font (montserrat_28)
+        String ante_text = formatBlindValue(blinds.bigBlindAnte) + " BB ante";
+        lv_obj_t *ante_label = lv_label_create(lv_scr_act());
+        lv_label_set_text(ante_label, ante_text.c_str());
+        lv_obj_set_style_text_color(ante_label, lv_color_white(), 0);
+        lv_obj_set_style_text_font(ante_label, &lv_font_montserrat_28, 0);
+        lv_obj_align(ante_label, LV_ALIGN_TOP_MID, 0, 115);
+    }
+    else
+    {
+        lv_obj_align(blinds_label, LV_ALIGN_CENTER, 0, -20);
+    }
+
+    // 4. Time Remaining String (Large font near bottom)
+    lv_obj_t *time_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(time_label, blinds.timeRemaining.c_str());
+    lv_obj_set_style_text_color(time_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_48, 0);
+    lv_obj_align(time_label, LV_ALIGN_BOTTOM_MID, 0, -40);
+}
