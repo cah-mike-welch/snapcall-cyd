@@ -4,6 +4,8 @@
 
 void BlindsScreen::show(const Blinds &blinds, int tableNumber)
 {
+    timeLabel_ = nullptr;
+
     // 1. Title Label (Table Number)
     lv_obj_t *title_label = lv_label_create(lv_scr_act());
     char title_buf[64];
@@ -38,9 +40,17 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber)
     }
 
     // 4. Time Remaining String (Large font near bottom)
-    lv_obj_t *time_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(time_label, blinds.timeRemaining.c_str());
-    lv_obj_set_style_text_color(time_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(time_label, &lv_font_montserrat_48, 0);
-    lv_obj_align(time_label, LV_ALIGN_BOTTOM_MID, 0, -40);
+    timeLabel_ = lv_label_create(lv_scr_act());
+    lv_label_set_text(timeLabel_, blinds.timeRemaining.c_str());
+    lv_obj_set_style_text_color(timeLabel_, lv_color_white(), 0);
+    lv_obj_set_style_text_font(timeLabel_, &lv_font_montserrat_48, 0);
+    lv_obj_align(timeLabel_, LV_ALIGN_BOTTOM_MID, 0, -40);
+}
+
+void BlindsScreen::updateTimeRemaining(const String &timeRemaining)
+{
+    if (timeLabel_)
+    {
+        lv_label_set_text(timeLabel_, timeRemaining.c_str());
+    }
 }

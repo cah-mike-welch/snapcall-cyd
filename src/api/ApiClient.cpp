@@ -137,6 +137,8 @@ ApiResult ApiClient::getCurrentBlinds(int clubId, Blinds &blinds)
     blinds.bigBlind = atoi(bbStr);
     blinds.bigBlindAnte = atoi(bbaStr);
     blinds.timeRemaining = timeRemStr;
+    blinds.isRunning = doc["data"]["is_running"] | false;
+    blinds.levelType = doc["data"]["level_type"] | "Play";
 
     return ApiResult::Success;
 }

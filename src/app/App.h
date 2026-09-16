@@ -29,6 +29,8 @@ private:
     void fetchClubsAndShowScreen();
     void fetchTablesAndShowScreen();
     void fetchBlindsAndShowScreen();
+    void resyncBlinds();
+    void updateBlindsCountdown();
 
     void onClubSelected(const Club &club);
     void onTableSelected(const Table &table);
@@ -50,6 +52,14 @@ private:
 
     std::unique_ptr<ClubSelectionScreen> clubScreen_;
     std::unique_ptr<TableSelectionScreen> tableScreen_;
+    BlindsScreen blindsScreen_;
+
+    // Blinds countdown: server is the source of truth, resynced every kBlindsResyncIntervalMs.
+    Blinds currentBlinds_;
+    int blindsRemainingSeconds_ = 0;
+    bool blindsTimeUsesHours_ = false;
+    unsigned long blindsLastTickMs_ = 0;
+    unsigned long blindsLastResyncMs_ = 0;
 
     lv_obj_t *labelStatus_ = nullptr;
     lv_obj_t *labelWifi_ = nullptr;
