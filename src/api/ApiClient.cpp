@@ -133,9 +133,9 @@ ApiResult ApiClient::getCurrentBlinds(int clubId, Blinds &blinds)
     const char *bbaStr = doc["data"]["big_blind_ante"] | "0";
     const char *timeRemStr = doc["data"]["time_remaining"] | "00:00";
 
-    blinds.smallBlind = atoi(sbStr);
-    blinds.bigBlind = atoi(bbStr);
-    blinds.bigBlindAnte = atoi(bbaStr);
+    blinds.smallBlind = sbStr;
+    blinds.bigBlind = bbStr;
+    blinds.bigBlindAnte = bbaStr;
     blinds.timeRemaining = timeRemStr;
     blinds.isRunning = doc["data"]["is_running"] | false;
     blinds.levelType = doc["data"]["level_type"] | "Play";

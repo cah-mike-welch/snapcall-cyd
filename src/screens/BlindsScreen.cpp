@@ -14,20 +14,20 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber)
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 15);
 
-    // 2. Main Blinds String (e.g., 100-200)
-    String blinds_text = formatBlindValue(blinds.smallBlind) + "-" + formatBlindValue(blinds.bigBlind);
+    // 2. Main Blinds String (e.g., 800-1.6K)
+    String blinds_text = blinds.smallBlind + "-" + blinds.bigBlind;
     lv_obj_t *blinds_label = lv_label_create(lv_scr_act());
     lv_label_set_text(blinds_label, blinds_text.c_str());
     lv_obj_set_style_text_color(blinds_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(blinds_label, &lv_font_montserrat_48, 0);
 
     // 3. Conditional Layout based on Big Blind Ante
-    if (blinds.bigBlindAnte > 0)
+    if (blinds.bigBlindAnte.toFloat() > 0)
     {
         lv_obj_align(blinds_label, LV_ALIGN_TOP_MID, 0, 50);
 
         // Ante line below blinds using smaller font (montserrat_28)
-        String ante_text = formatBlindValue(blinds.bigBlindAnte) + " BB ante";
+        String ante_text = blinds.bigBlindAnte + " BB ante";
         lv_obj_t *ante_label = lv_label_create(lv_scr_act());
         lv_label_set_text(ante_label, ante_text.c_str());
         lv_obj_set_style_text_color(ante_label, lv_color_white(), 0);
