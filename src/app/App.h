@@ -9,12 +9,16 @@
 #include "screens/ClubSelectionScreen.h"
 #include "screens/TableSelectionScreen.h"
 #include "screens/BlindsScreen.h"
+#include "screens/PlayersScreen.h"
+#include "screens/ConfirmEliminateScreen.h"
 
 enum class AppState
 {
     ClubSelection,
     TableSelection,
-    Blinds
+    Blinds,
+    Players,
+    ConfirmEliminate
 };
 
 // Coordinates WiFi, the API client, the display/touch hardware, and screen navigation.
@@ -29,11 +33,15 @@ private:
     void fetchClubsAndShowScreen();
     void fetchTablesAndShowScreen();
     void fetchBlindsAndShowScreen();
+    void fetchPlayersAndShowScreen();
     void resyncBlinds();
     void updateBlindsCountdown();
 
     void onClubSelected(const Club &club);
     void onTableSelected(const Table &table);
+    void onPlayerSelected(const Player &player);
+    void onEliminateConfirmed();
+    void onEliminateCancelled();
 
     WifiManager wifiManager_;
     ApiClient apiClient_;
@@ -53,6 +61,9 @@ private:
     std::unique_ptr<ClubSelectionScreen> clubScreen_;
     std::unique_ptr<TableSelectionScreen> tableScreen_;
     BlindsScreen blindsScreen_;
+    PlayersScreen playersScreen_;
+    ConfirmEliminateScreen confirmEliminateScreen_;
+    Player selectedPlayerForElimination_;
 
     // Blinds countdown: server is the source of truth, resynced every kBlindsResyncIntervalMs.
     Blinds currentBlinds_;

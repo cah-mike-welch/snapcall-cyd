@@ -5,6 +5,7 @@
 #include "models/Club.h"
 #include "models/Tournament.h"
 #include "models/Blinds.h"
+#include "models/Player.h"
 
 enum class ApiResult
 {
@@ -21,7 +22,9 @@ public:
     ApiResult getClubs(std::vector<Club> &clubs);
     ApiResult getCurrentTournament(int clubId, Tournament &tournament);
     ApiResult getCurrentBlinds(int clubId, Blinds &blinds);
+    ApiResult getPlayers(int clubId, int tableId, std::vector<Player> &players);
+    ApiResult eliminatePlayer(int clubId, int playerId);
 
 private:
-    ApiResult performGet(const char *url, JsonDocument &doc) const;
+    ApiResult performRequest(const char *method, const char *url, JsonDocument &doc) const;
 };

@@ -2,6 +2,12 @@
 
 #include <Arduino.h>
 
+namespace
+{
+    constexpr unsigned long kBlindsTickIntervalMs = 1000;
+    constexpr unsigned long kBlindsResyncIntervalMs = 10000;
+}
+
 // ==========================================
 // BASE UI
 // ==========================================
@@ -59,8 +65,14 @@ void App::fetchBlindsAndShowScreen()
 
     if (result == ApiResult::Success)
     {
-        BlindsScreen blindsScreen;
-        blindsScreen.show(blinds, selectedTableNumber_);
+        currentBlinds_ = blinds;
+        blindsRemainingSeconds_ = parseTimeRemainingToSeconds(blinds.timeRemaining);
+        blindsTimeUsesHours_ = timeRemainingUsesHours(blinds.timeRemaining);
+        blindsLastTickMs_ = millis();
+        blindsLastResyncMs_ = millis();
+
+        blindsScreen_.show(blinds, selectedTableNumber_, [this]
+                           { fetchPlayersAndShowScreen(); });
     }
     else
     {
@@ -68,6 +80,132 @@ void App::fetchBlindsAndShowScreen()
     }
 
     state_ = AppState::Blinds;
+}
+
+// Re-fetches blinds from the API (source of truth) and refreshes the screen.
+void App::resyncBlinds()
+{
+    if (!wifiManager_.isConnected())
+    {
+        return;
+    }
+
+    Blinds blinds;
+    ApiResult result = apiClient_.getCurrentBlinds(selectedClubId_, blinds);
+
+    if (result != ApiResult::Success)
+    {
+        Serial.println("[API] Failed to resync blinds");
+        return;
+    }
+
+    currentBlinds_ = blinds;
+    blindsRemainingSeconds_ = parseTimeRemainingToSeconds(blinds.timeRemaining);
+    blindsTimeUsesHours_ = timeRemainingUsesHours(blinds.timeRemaining);
+    blindsLastTickMs_ = millis();
+
+    lv_obj_clean(lv_scr_act());
+    displayManager_.setDarkBackground();
+    blindsScreen_.show(blinds, selectedTableNumber_, [this]
+                       { fetchPlayersAndShowScreen(); });
+}
+
+// Ticks the countdown once per second (only while the clock is running) and resyncs from the API periodically.
+void App::updateBlindsCountdown()
+{
+    unsigned long now = millis();
+
+    if (now - blindsLastResyncMs_ >= kBlindsResyncIntervalMs)
+    {
+        blindsLastResyncMs_ = now;
+        resyncBlinds();
+        return;
+    }
+
+    if (!currentBlinds_.isRunning)
+    {
+        blindsLastTickMs_ = now;
+        return;
+    }
+
+    if (now - blindsLastTickMs_ >= kBlindsTickIntervalMs)
+    {
+        blindsLastTickMs_ += kBlindsTickIntervalMs;
+
+        if (blindsRemainingSeconds_ > 0)
+        {
+            blindsRemainingSeconds_--;
+        }
+
+        blindsScreen_.updateTimeRemaining(formatSecondsToTimeRemaining(blindsRemainingSeconds_, blindsTimeUsesHours_));
+    }
+}
+
+// ==========================================
+// PLAYERS
+// ==========================================
+void App::fetchPlayersAndShowScreen()
+{
+    if (!wifiManager_.isConnected())
+    {
+        return;
+    }
+
+    lv_obj_clean(lv_scr_act());
+    displayManager_.setDarkBackground();
+
+    std::vector<Player> players;
+    ApiResult result = apiClient_.getPlayers(selectedClubId_, selectedTableId_, players);
+
+    if (result == ApiResult::Success)
+    {
+        playersScreen_.show(players, [this]
+                            { fetchBlindsAndShowScreen(); }, [this](const Player &player)
+                            { onPlayerSelected(player); });
+    }
+    else
+    {
+        Serial.println("[API] Failed to fetch players");
+    }
+
+    state_ = AppState::Players;
+}
+
+// ==========================================
+// CONFIRM ELIMINATE
+// ==========================================
+void App::onPlayerSelected(const Player &player)
+{
+    selectedPlayerForElimination_ = player;
+
+    lv_obj_clean(lv_scr_act());
+    displayManager_.setDarkBackground();
+
+    confirmEliminateScreen_.show(
+        player,
+        [this]
+        { onEliminateConfirmed(); },
+        [this]
+        { onEliminateCancelled(); });
+
+    state_ = AppState::ConfirmEliminate;
+}
+
+void App::onEliminateConfirmed()
+{
+    ApiResult result = apiClient_.eliminatePlayer(selectedClubId_, selectedPlayerForElimination_.id);
+
+    if (result != ApiResult::Success)
+    {
+        Serial.println("[API] Failed to eliminate player");
+    }
+
+    fetchPlayersAndShowScreen();
+}
+
+void App::onEliminateCancelled()
+{
+    fetchPlayersAndShowScreen();
 }
 
 // ==========================================
@@ -199,6 +337,11 @@ void App::begin()
 void App::loop()
 {
     wifiManager_.maintainConnection();
+
+    if (state_ == AppState::Blinds)
+    {
+        updateBlindsCountdown();
+    }
 
     lv_timer_handler();
     delay(5);

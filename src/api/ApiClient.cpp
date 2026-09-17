@@ -3,9 +3,10 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include <string.h>
 #include "config/AppConfig.h"
 
-ApiResult ApiClient::performGet(const char *url, JsonDocument &doc) const
+ApiResult ApiClient::performRequest(const char *method, const char *url, JsonDocument &doc) const
 {
     if (WiFi.status() != WL_CONNECTED)
     {
@@ -22,7 +23,7 @@ ApiResult ApiClient::performGet(const char *url, JsonDocument &doc) const
 
     ApiResult result = ApiResult::HttpError;
 
-    Serial.printf("[API] GET %s\n", url);
+    Serial.printf("[API] %s %s\n", method, url);
 
     if (http.begin(client, url))
     {
@@ -30,7 +31,7 @@ ApiResult ApiClient::performGet(const char *url, JsonDocument &doc) const
         http.addHeader("Accept", "application/json");
         http.addHeader("User-Agent", "ESP32-CYD");
 
-        int httpCode = http.GET();
+        int httpCode = (strcmp(method, "POST") == 0) ? http.POST("") : http.GET();
 
         if (httpCode == HTTP_CODE_OK)
         {
@@ -49,7 +50,7 @@ ApiResult ApiClient::performGet(const char *url, JsonDocument &doc) const
         }
         else
         {
-            Serial.printf("[API] GET failed, code: %d, url: %s\n", httpCode, url);
+            Serial.printf("[API] %s failed, code: %d, url: %s\n", method, httpCode, url);
         }
 
         http.end();
@@ -64,7 +65,7 @@ ApiResult ApiClient::getClubs(std::vector<Club> &clubs)
     snprintf(url, sizeof(url), "%s/clubs", AppConfig::kApiBaseUrl);
 
     JsonDocument doc;
-    ApiResult result = performGet(url, doc);
+    ApiResult result = performRequest("GET", url, doc);
 
     if (result != ApiResult::Success)
     {
@@ -91,7 +92,7 @@ ApiResult ApiClient::getCurrentTournament(int clubId, Tournament &tournament)
     snprintf(url, sizeof(url), "%s/clubs/%d/current-tournament", AppConfig::kApiBaseUrl, clubId);
 
     JsonDocument doc;
-    ApiResult result = performGet(url, doc);
+    ApiResult result = performRequest("GET", url, doc);
 
     if (result != ApiResult::Success)
     {
@@ -121,7 +122,7 @@ ApiResult ApiClient::getCurrentBlinds(int clubId, Blinds &blinds)
     snprintf(url, sizeof(url), "%s/clubs/%d/current-blinds", AppConfig::kApiBaseUrl, clubId);
 
     JsonDocument doc;
-    ApiResult result = performGet(url, doc);
+    ApiResult result = performRequest("GET", url, doc);
 
     if (result != ApiResult::Success)
     {
@@ -141,4 +142,41 @@ ApiResult ApiClient::getCurrentBlinds(int clubId, Blinds &blinds)
     blinds.levelType = doc["data"]["level_type"] | "Play";
 
     return ApiResult::Success;
+}
+
+ApiResult ApiClient::getPlayers(int clubId, int tableId, std::vector<Player> &players)
+{
+    char url[128];
+    snprintf(url, sizeof(url), "%s/clubs/%d/tables/%d/players", AppConfig::kApiBaseUrl, clubId, tableId);
+
+    JsonDocument doc;
+    ApiResult result = performRequest("GET", url, doc);
+
+    if (result != ApiResult::Success)
+    {
+        return result;
+    }
+
+    players.clear();
+    JsonArray playersJson = doc["data"]["players"];
+    for (JsonObject playerJson : playersJson)
+    {
+        Player player;
+        player.id = playerJson["id"] | 0;
+        player.firstName = playerJson["first_name"] | "";
+        player.lastName = playerJson["last_name"] | "";
+        player.seatNumber = playerJson["seat_number"] | 0;
+        players.push_back(player);
+    }
+
+    return ApiResult::Success;
+}
+
+ApiResult ApiClient::eliminatePlayer(int clubId, int playerId)
+{
+    char url[128];
+    snprintf(url, sizeof(url), "%s/clubs/%d/players/%d/eliminate", AppConfig::kApiBaseUrl, clubId, playerId);
+
+    JsonDocument doc;
+    return performRequest("POST", url, doc);
 }
