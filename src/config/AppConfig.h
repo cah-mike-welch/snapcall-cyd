@@ -36,6 +36,7 @@ namespace AppConfig
     constexpr WifiCredential kWifiNetworks[] = {
         {"370Katiebud", "mbebmike"},
         {"IHC of Cincinnati", "1r1shJig"},
+        {"milford", "5133255070"},
     };
 
     // API
