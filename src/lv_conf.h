@@ -26,6 +26,7 @@
 /* Enable default font */
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
+#define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_28
@@ -41,7 +42,7 @@
 #define LV_USE_CANVAS 0
 #define LV_USE_CHECKBOX 0
 #define LV_USE_DROPDOWN 0
-#define LV_USE_IMG 0
+#define LV_USE_IMG 1
 #define LV_USE_LINE 0
 #define LV_USE_ROLLER 0
 #define LV_USE_SLIDER 0

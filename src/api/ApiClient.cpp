@@ -180,3 +180,21 @@ ApiResult ApiClient::eliminatePlayer(int clubId, int playerId)
     JsonDocument doc;
     return performRequest("POST", url, doc);
 }
+
+ApiResult ApiClient::startClock(int clubId)
+{
+    char url[128];
+    snprintf(url, sizeof(url), "%s/clubs/%d/clock/start", AppConfig::kApiBaseUrl, clubId);
+
+    JsonDocument doc;
+    return performRequest("POST", url, doc);
+}
+
+ApiResult ApiClient::stopClock(int clubId)
+{
+    char url[128];
+    snprintf(url, sizeof(url), "%s/clubs/%d/clock/stop", AppConfig::kApiBaseUrl, clubId);
+
+    JsonDocument doc;
+    return performRequest("POST", url, doc);
+}

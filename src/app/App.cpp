@@ -72,7 +72,8 @@ void App::fetchBlindsAndShowScreen()
         blindsLastResyncMs_ = millis();
 
         blindsScreen_.show(blinds, selectedTableNumber_, [this]
-                           { fetchPlayersAndShowScreen(); });
+                           { fetchPlayersAndShowScreen(); }, [this]
+                           { onClockToggled(); });
     }
     else
     {
@@ -107,7 +108,29 @@ void App::resyncBlinds()
     lv_obj_clean(lv_scr_act());
     displayManager_.setDarkBackground();
     blindsScreen_.show(blinds, selectedTableNumber_, [this]
-                       { fetchPlayersAndShowScreen(); });
+                       { fetchPlayersAndShowScreen(); }, [this]
+                       { onClockToggled(); });
+}
+
+// Starts or stops the clock based on the last known state. The resync is deferred to the next loop tick
+// because it rebuilds the screen, which would delete the button whose click event is still being dispatched.
+void App::onClockToggled()
+{
+    if (!wifiManager_.isConnected())
+    {
+        return;
+    }
+
+    ApiResult result = currentBlinds_.isRunning
+                           ? apiClient_.stopClock(selectedClubId_)
+                           : apiClient_.startClock(selectedClubId_);
+
+    if (result != ApiResult::Success)
+    {
+        Serial.println("[API] Failed to toggle clock");
+    }
+
+    blindsResyncPending_ = true;
 }
 
 // Ticks the countdown once per second (only while the clock is running) and resyncs from the API periodically.
@@ -115,8 +138,9 @@ void App::updateBlindsCountdown()
 {
     unsigned long now = millis();
 
-    if (now - blindsLastResyncMs_ >= kBlindsResyncIntervalMs)
+    if (blindsResyncPending_ || now - blindsLastResyncMs_ >= kBlindsResyncIntervalMs)
     {
+        blindsResyncPending_ = false;
         blindsLastResyncMs_ = now;
         resyncBlinds();
         return;
@@ -308,9 +332,7 @@ void App::fetchClubsAndShowScreen()
     clubScreen_->show(clubs, [this](const Club &club)
                       { onClubSelected(club); });
 
-    lv_label_set_text(labelStatus_, "Ready.");
-    lv_obj_set_style_text_color(labelStatus_, lv_color_white(), 0);
-
+    lv_label_set_text(labelStatus_, "");
     state_ = AppState::ClubSelection;
 }
 

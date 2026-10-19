@@ -24,7 +24,8 @@ void DisplayManager::flushCallback(lv_disp_drv_t *dispDrv, const lv_area_t *area
     uint32_t h = (area->y2 - area->y1 + 1);
     s_tft.startWrite();
     s_tft.setAddrWindow(area->x1, area->y1, w, h);
-    s_tft.pushColors((uint16_t *)&colorP->full, w * h, true);
+    // LV_COLOR_16_SWAP already byte-swaps the buffer, so don't swap again here.
+    s_tft.pushColors((uint16_t *)&colorP->full, w * h, false);
     s_tft.endWrite();
     lv_disp_flush_ready(dispDrv);
 }

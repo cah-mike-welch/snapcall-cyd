@@ -24,6 +24,8 @@ public:
     ApiResult getCurrentBlinds(int clubId, Blinds &blinds);
     ApiResult getPlayers(int clubId, int tableId, std::vector<Player> &players);
     ApiResult eliminatePlayer(int clubId, int playerId);
+    ApiResult startClock(int clubId);
+    ApiResult stopClock(int clubId);
 
 private:
     ApiResult performRequest(const char *method, const char *url, JsonDocument &doc) const;

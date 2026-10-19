@@ -1,4 +1,5 @@
 #include "TableSelectionScreen.h"
+#include "UiTheme.h"
 
 void TableSelectionScreen::show(const Tournament &tournament, SelectCallback onSelect)
 {
@@ -23,7 +24,7 @@ void TableSelectionScreen::show(const Tournament &tournament, SelectCallback onS
         lv_obj_t *btn = lv_btn_create(lv_scr_act());
         lv_obj_set_size(btn, 200, 40);
         lv_obj_align(btn, LV_ALIGN_TOP_MID, 0, y_offset);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x222222), 0);
+        UiTheme::styleButton(btn);
         lv_obj_set_style_border_color(btn, lv_color_white(), 0);
         lv_obj_set_style_border_width(btn, 1, 0);
 

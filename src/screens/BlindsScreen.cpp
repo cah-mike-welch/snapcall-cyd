@@ -2,9 +2,19 @@
 
 #include <lvgl.h>
 
-void BlindsScreen::show(const Blinds &blinds, int tableNumber, std::function<void()> onNavigateToPlayers)
+#include "UiTheme.h"
+
+namespace
+{
+    constexpr int kClockBtnWidth = 160;
+    constexpr int kClockBtnHeight = 40;
+    constexpr int kClockBtnBottomMargin = 12;
+}
+
+void BlindsScreen::show(const Blinds &blinds, int tableNumber, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
 {
     timeLabel_ = nullptr;
+    onToggleClock_ = std::move(onToggleClock);
 
     navBar_.show(NavTarget::Blinds, std::function<void()>(), std::move(onNavigateToPlayers));
 
@@ -46,7 +56,36 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber, std::function<voi
     lv_label_set_text(timeLabel_, blinds.timeRemaining.c_str());
     lv_obj_set_style_text_color(timeLabel_, lv_color_white(), 0);
     lv_obj_set_style_text_font(timeLabel_, &lv_font_montserrat_48, 0);
-    lv_obj_align(timeLabel_, LV_ALIGN_BOTTOM_MID, 0, -40);
+    lv_obj_align(timeLabel_, LV_ALIGN_BOTTOM_MID, 0, -64);
+
+    // 5. Clock start/stop button below the time remaining
+    lv_obj_t *clockBtn = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(clockBtn, kClockBtnWidth, kClockBtnHeight);
+    lv_obj_align(clockBtn, LV_ALIGN_BOTTOM_MID, 0, -kClockBtnBottomMargin);
+    UiTheme::styleButton(clockBtn);
+    lv_obj_set_style_border_color(clockBtn, lv_color_white(), 0);
+    lv_obj_set_style_border_width(clockBtn, 1, 0);
+    lv_obj_add_event_cb(clockBtn, clockBtnEventCb, LV_EVENT_CLICKED, this);
+
+    lv_obj_t *clockBtnLabel = lv_label_create(clockBtn);
+    lv_label_set_text(clockBtnLabel, blinds.isRunning ? "Stop clock" : "Start clock");
+    lv_obj_set_style_text_color(clockBtnLabel, lv_color_white(), 0);
+    lv_obj_set_style_text_font(clockBtnLabel, &lv_font_montserrat_20, 0);
+    lv_obj_center(clockBtnLabel);
+}
+
+void BlindsScreen::clockBtnEventCb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+    {
+        return;
+    }
+
+    auto *screen = static_cast<BlindsScreen *>(lv_event_get_user_data(e));
+    if (screen && screen->onToggleClock_)
+    {
+        screen->onToggleClock_();
+    }
 }
 
 void BlindsScreen::updateTimeRemaining(const String &timeRemaining)

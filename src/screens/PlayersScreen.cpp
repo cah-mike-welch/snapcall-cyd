@@ -1,4 +1,5 @@
 #include "PlayersScreen.h"
+#include "UiTheme.h"
 
 namespace
 {
@@ -34,7 +35,7 @@ void PlayersScreen::show(const std::vector<Player> &players, std::function<void(
         lv_obj_t *btn = lv_btn_create(lv_scr_act());
         lv_obj_set_size(btn, kColumnWidth, kRowHeight);
         lv_obj_set_pos(btn, x, y);
-        lv_obj_set_style_bg_color(btn, lv_color_hex(0x222222), 0);
+        UiTheme::styleButton(btn);
         lv_obj_set_style_border_color(btn, lv_color_white(), 0);
         lv_obj_set_style_border_width(btn, 1, 0);
 

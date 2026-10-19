@@ -1,4 +1,5 @@
 #include "ConfirmEliminateScreen.h"
+#include "UiTheme.h"
 
 namespace
 {
@@ -27,7 +28,7 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_t *eliminateBtn = lv_btn_create(lv_scr_act());
     lv_obj_set_size(eliminateBtn, kButtonWidth, kButtonHeight);
     lv_obj_align(eliminateBtn, LV_ALIGN_BOTTOM_MID, -60, -40);
-    lv_obj_set_style_bg_color(eliminateBtn, lv_color_hex(0x881111), 0);
+    UiTheme::styleButton(eliminateBtn);
     lv_obj_set_style_border_color(eliminateBtn, lv_color_white(), 0);
     lv_obj_set_style_border_width(eliminateBtn, 1, 0);
     lv_obj_add_event_cb(eliminateBtn, eliminateBtnEventCb, LV_EVENT_CLICKED, this);
@@ -35,13 +36,13 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_t *eliminateLabel = lv_label_create(eliminateBtn);
     lv_label_set_text(eliminateLabel, "Eliminate");
     lv_obj_set_style_text_color(eliminateLabel, lv_color_white(), 0);
-    lv_obj_set_style_text_font(eliminateLabel, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(eliminateLabel, &lv_font_montserrat_20, 0);
     lv_obj_center(eliminateLabel);
 
     lv_obj_t *cancelBtn = lv_btn_create(lv_scr_act());
     lv_obj_set_size(cancelBtn, kButtonWidth, kButtonHeight);
     lv_obj_align(cancelBtn, LV_ALIGN_BOTTOM_MID, 60, -40);
-    lv_obj_set_style_bg_color(cancelBtn, lv_color_hex(0x222222), 0);
+    UiTheme::styleButton(cancelBtn);
     lv_obj_set_style_border_color(cancelBtn, lv_color_white(), 0);
     lv_obj_set_style_border_width(cancelBtn, 1, 0);
     lv_obj_add_event_cb(cancelBtn, cancelBtnEventCb, LV_EVENT_CLICKED, this);
@@ -49,7 +50,7 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
     lv_label_set_text(cancelLabel, "Cancel");
     lv_obj_set_style_text_color(cancelLabel, lv_color_white(), 0);
-    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(cancelLabel, &lv_font_montserrat_20, 0);
     lv_obj_center(cancelLabel);
 }
 
