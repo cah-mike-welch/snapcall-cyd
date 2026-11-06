@@ -2,10 +2,26 @@
 
 #include <Arduino.h>
 
+#include "config/AppConfig.h"
+
 namespace
 {
     constexpr unsigned long kBlindsTickIntervalMs = 1000;
     constexpr unsigned long kBlindsResyncIntervalMs = 10000;
+    constexpr unsigned long kBatteryRefreshIntervalMs = 60000;
+
+    // Averages several calibrated ADC readings and undoes the voltage divider.
+    float readBatteryVoltage()
+    {
+        uint32_t sumMv = 0;
+        for (uint8_t i = 0; i < AppConfig::kBatteryAdcSamples; i++)
+        {
+            sumMv += analogReadMilliVolts(AppConfig::kBatteryAdcPin);
+        }
+
+        float pinVolts = static_cast<float>(sumMv) / AppConfig::kBatteryAdcSamples / 1000.0f;
+        return pinVolts * AppConfig::kBatteryDividerRatio;
+    }
 }
 
 // ==========================================
@@ -71,7 +87,7 @@ void App::fetchBlindsAndShowScreen()
         blindsLastTickMs_ = millis();
         blindsLastResyncMs_ = millis();
 
-        blindsScreen_.show(blinds, selectedTableNumber_, [this]
+        blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, [this]
                            { fetchPlayersAndShowScreen(); }, [this]
                            { onClockToggled(); });
     }
@@ -107,7 +123,7 @@ void App::resyncBlinds()
 
     lv_obj_clean(lv_scr_act());
     displayManager_.setDarkBackground();
-    blindsScreen_.show(blinds, selectedTableNumber_, [this]
+    blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, [this]
                        { fetchPlayersAndShowScreen(); }, [this]
                        { onClockToggled(); });
 }
@@ -162,6 +178,24 @@ void App::updateBlindsCountdown()
         }
 
         blindsScreen_.updateTimeRemaining(formatSecondsToTimeRemaining(blindsRemainingSeconds_, blindsTimeUsesHours_));
+    }
+}
+
+// Re-reads the battery voltage once per kBatteryRefreshIntervalMs and updates the label if the Blinds screen is showing.
+void App::updateBatteryVoltage()
+{
+    unsigned long now = millis();
+    if (now - batteryLastReadMs_ < kBatteryRefreshIntervalMs)
+    {
+        return;
+    }
+
+    batteryLastReadMs_ = now;
+    batteryVoltage_ = readBatteryVoltage();
+
+    if (state_ == AppState::Blinds)
+    {
+        blindsScreen_.updateBatteryVoltage(batteryVoltage_);
     }
 }
 
@@ -350,6 +384,11 @@ void App::begin()
     displayManager_.begin();
     touchManager_.begin();
 
+    pinMode(AppConfig::kBatteryAdcPin, INPUT);
+    analogSetPinAttenuation(AppConfig::kBatteryAdcPin, ADC_11db);
+    batteryVoltage_ = readBatteryVoltage();
+    batteryLastReadMs_ = millis();
+
     createBaseUi();
     fetchClubsAndShowScreen();
 
@@ -364,6 +403,8 @@ void App::loop()
     {
         updateBlindsCountdown();
     }
+
+    updateBatteryVoltage();
 
     lv_timer_handler();
     delay(5);

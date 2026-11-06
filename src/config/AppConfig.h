@@ -22,6 +22,11 @@ namespace AppConfig
     constexpr uint16_t kTouchMinY = 400;
     constexpr uint16_t kTouchMaxY = 3800;
 
+    // Battery voltage sense: 1:1 divider (100K battery-to-pin, 100K pin-to-GND), so the pin reads half the battery voltage
+    constexpr uint8_t kBatteryAdcPin = 35;
+    constexpr float kBatteryDividerRatio = 2.0f;
+    constexpr uint8_t kBatteryAdcSamples = 8;
+
     // Screen dimensions
     constexpr uint16_t kScreenWidth = 240;
     constexpr uint16_t kScreenHeight = 320;

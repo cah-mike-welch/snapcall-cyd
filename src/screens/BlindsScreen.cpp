@@ -9,11 +9,23 @@ namespace
     constexpr int kClockBtnWidth = 160;
     constexpr int kClockBtnHeight = 40;
     constexpr int kClockBtnBottomMargin = 12;
+
+    // Fixed box width so the centered text stays put when the reading changes.
+    constexpr int kBatteryLabelWidth = 120;
+    constexpr uint32_t kBatteryLabelColor = 0xAAAAAA;
+
+    void setBatteryText(lv_obj_t *label, float batteryVoltage)
+    {
+        char buf[24];
+        snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
+        lv_label_set_text(label, buf);
+    }
 }
 
-void BlindsScreen::show(const Blinds &blinds, int tableNumber, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
+void BlindsScreen::show(const Blinds &blinds, int tableNumber, float batteryVoltage, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
 {
     timeLabel_ = nullptr;
+    batteryLabel_ = nullptr;
     onToggleClock_ = std::move(onToggleClock);
 
     navBar_.show(NavTarget::Blinds, std::function<void()>(), std::move(onNavigateToPlayers));
@@ -58,7 +70,16 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber, std::function<voi
     lv_obj_set_style_text_font(timeLabel_, &lv_font_montserrat_48, 0);
     lv_obj_align(timeLabel_, LV_ALIGN_BOTTOM_MID, 0, -64);
 
-    // 5. Clock start/stop button below the time remaining
+    // 5. Battery voltage, small and centered directly above the time remaining
+    batteryLabel_ = lv_label_create(lv_scr_act());
+    setBatteryText(batteryLabel_, batteryVoltage);
+    lv_obj_set_width(batteryLabel_, kBatteryLabelWidth);
+    lv_obj_set_style_text_align(batteryLabel_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(batteryLabel_, lv_color_hex(kBatteryLabelColor), 0);
+    lv_obj_set_style_text_font(batteryLabel_, &lv_font_montserrat_14, 0);
+    lv_obj_align_to(batteryLabel_, timeLabel_, LV_ALIGN_OUT_TOP_MID, 0, 0);
+
+    // 6. Clock start/stop button below the time remaining
     lv_obj_t *clockBtn = lv_btn_create(lv_scr_act());
     lv_obj_set_size(clockBtn, kClockBtnWidth, kClockBtnHeight);
     lv_obj_align(clockBtn, LV_ALIGN_BOTTOM_MID, 0, -kClockBtnBottomMargin);
@@ -93,5 +114,13 @@ void BlindsScreen::updateTimeRemaining(const String &timeRemaining)
     if (timeLabel_)
     {
         lv_label_set_text(timeLabel_, timeRemaining.c_str());
+    }
+}
+
+void BlindsScreen::updateBatteryVoltage(float batteryVoltage)
+{
+    if (batteryLabel_)
+    {
+        setBatteryText(batteryLabel_, batteryVoltage);
     }
 }
