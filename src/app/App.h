@@ -75,7 +75,8 @@ private:
     unsigned long blindsLastResyncMs_ = 0;
     bool blindsResyncPending_ = false;
 
-    // Battery level (0-100%): read on boot and then once per minute; shown on the Blinds screen.
+    // Battery level: voltage and percent (0-100%), read on boot and then once per minute; shown on the Blinds screen.
+    float batteryVoltage_ = 0.0f;
     int batteryPercent_ = 0;
     unsigned long batteryLastReadMs_ = 0;
 

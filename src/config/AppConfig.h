@@ -22,9 +22,10 @@ namespace AppConfig
     constexpr uint16_t kTouchMinY = 400;
     constexpr uint16_t kTouchMaxY = 3800;
 
-    // Battery voltage sense: 1:1 divider (100K battery-to-pin, 100K pin-to-GND), so the pin reads half the battery voltage
+    // Battery sense on GPIO35 through 100K/100K. The ADC reads low at this source impedance (~7% of
+    // the true pin voltage), so the scale is calibrated to a multimeter: 3.81V battery read as 0.14V at the pin.
     constexpr uint8_t kBatteryAdcPin = 35;
-    constexpr float kBatteryDividerRatio = 2.0f;
+    constexpr float kBatteryVoltageScale = 27.2f;
     constexpr uint8_t kBatteryAdcSamples = 8;
 
     // Screen dimensions

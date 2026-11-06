@@ -10,7 +10,7 @@ namespace
     constexpr unsigned long kBlindsResyncIntervalMs = 10000;
     constexpr unsigned long kBatteryRefreshIntervalMs = 60000;
 
-    // Averages several calibrated ADC readings and undoes the voltage divider.
+    // Averages several ADC readings and scales the pin voltage to battery voltage.
     float readBatteryVoltage()
     {
         uint32_t sumMv = 0;
@@ -20,7 +20,7 @@ namespace
         }
 
         float pinVolts = static_cast<float>(sumMv) / AppConfig::kBatteryAdcSamples / 1000.0f;
-        return pinVolts * AppConfig::kBatteryDividerRatio;
+        return pinVolts * AppConfig::kBatteryVoltageScale;
     }
 
     // Maps a 1S LiPo voltage to 0-100% by interpolating a resting discharge curve.
@@ -136,7 +136,7 @@ void App::fetchBlindsAndShowScreen()
         blindsLastTickMs_ = millis();
         blindsLastResyncMs_ = millis();
 
-        blindsScreen_.show(blinds, selectedTableNumber_, batteryPercent_, [this]
+        blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, batteryPercent_, [this]
                            { fetchPlayersAndShowScreen(); }, [this]
                            { onClockToggled(); });
     }
@@ -172,7 +172,7 @@ void App::resyncBlinds()
 
     lv_obj_clean(lv_scr_act());
     displayManager_.setDarkBackground();
-    blindsScreen_.show(blinds, selectedTableNumber_, batteryPercent_, [this]
+    blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, batteryPercent_, [this]
                        { fetchPlayersAndShowScreen(); }, [this]
                        { onClockToggled(); });
 }
@@ -240,11 +240,12 @@ void App::updateBatteryLevel()
     }
 
     batteryLastReadMs_ = now;
-    batteryPercent_ = getBatteryPercentage(readBatteryVoltage());
+    batteryVoltage_ = readBatteryVoltage();
+    batteryPercent_ = getBatteryPercentage(batteryVoltage_);
 
     if (state_ == AppState::Blinds)
     {
-        blindsScreen_.updateBatteryLevel(batteryPercent_);
+        blindsScreen_.updateBatteryLevel(batteryVoltage_, batteryPercent_);
     }
 }
 
@@ -435,7 +436,8 @@ void App::begin()
 
     pinMode(AppConfig::kBatteryAdcPin, INPUT);
     analogSetPinAttenuation(AppConfig::kBatteryAdcPin, ADC_11db);
-    batteryPercent_ = getBatteryPercentage(readBatteryVoltage());
+    batteryVoltage_ = readBatteryVoltage();
+    batteryPercent_ = getBatteryPercentage(batteryVoltage_);
     batteryLastReadMs_ = millis();
 
     createBaseUi();

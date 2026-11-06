@@ -11,18 +11,18 @@ namespace
     constexpr int kClockBtnBottomMargin = 12;
 
     // Fixed box width so the centered text stays put when the reading changes.
-    constexpr int kBatteryLabelWidth = 120;
+    constexpr int kBatteryLabelWidth = 180;
     constexpr uint32_t kBatteryLabelColor = 0xAAAAAA;
 
-    void setBatteryText(lv_obj_t *label, int batteryPercent)
+    void setBatteryText(lv_obj_t *label, float batteryVoltage, int batteryPercent)
     {
-        char buf[24];
-        snprintf(buf, sizeof(buf), "Battery: %d%%", batteryPercent);
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Battery: %.2fV (%d%%)", batteryVoltage, batteryPercent);
         lv_label_set_text(label, buf);
     }
 }
 
-void BlindsScreen::show(const Blinds &blinds, int tableNumber, int batteryPercent, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
+void BlindsScreen::show(const Blinds &blinds, int tableNumber, float batteryVoltage, int batteryPercent, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
 {
     timeLabel_ = nullptr;
     batteryLabel_ = nullptr;
@@ -72,7 +72,7 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber, int batteryPercen
 
     // 5. Battery level, small and centered directly above the time remaining
     batteryLabel_ = lv_label_create(lv_scr_act());
-    setBatteryText(batteryLabel_, batteryPercent);
+    setBatteryText(batteryLabel_, batteryVoltage, batteryPercent);
     lv_obj_set_width(batteryLabel_, kBatteryLabelWidth);
     lv_obj_set_style_text_align(batteryLabel_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(batteryLabel_, lv_color_hex(kBatteryLabelColor), 0);
@@ -117,10 +117,10 @@ void BlindsScreen::updateTimeRemaining(const String &timeRemaining)
     }
 }
 
-void BlindsScreen::updateBatteryLevel(int batteryPercent)
+void BlindsScreen::updateBatteryLevel(float batteryVoltage, int batteryPercent)
 {
     if (batteryLabel_)
     {
-        setBatteryText(batteryLabel_, batteryPercent);
+        setBatteryText(batteryLabel_, batteryVoltage, batteryPercent);
     }
 }
