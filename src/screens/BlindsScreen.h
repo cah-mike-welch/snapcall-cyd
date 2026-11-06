@@ -10,9 +10,9 @@
 class BlindsScreen
 {
 public:
-    void show(const Blinds &blinds, int tableNumber, float batteryVoltage, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock);
+    void show(const Blinds &blinds, int tableNumber, int batteryPercent, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock);
     void updateTimeRemaining(const String &timeRemaining);
-    void updateBatteryVoltage(float batteryVoltage);
+    void updateBatteryLevel(int batteryPercent);
 
 private:
     static void clockBtnEventCb(lv_event_t *e);

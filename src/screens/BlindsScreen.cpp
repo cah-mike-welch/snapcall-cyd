@@ -14,15 +14,15 @@ namespace
     constexpr int kBatteryLabelWidth = 120;
     constexpr uint32_t kBatteryLabelColor = 0xAAAAAA;
 
-    void setBatteryText(lv_obj_t *label, float batteryVoltage)
+    void setBatteryText(lv_obj_t *label, int batteryPercent)
     {
         char buf[24];
-        snprintf(buf, sizeof(buf), "Battery: %.2fV", batteryVoltage);
+        snprintf(buf, sizeof(buf), "Battery: %d%%", batteryPercent);
         lv_label_set_text(label, buf);
     }
 }
 
-void BlindsScreen::show(const Blinds &blinds, int tableNumber, float batteryVoltage, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
+void BlindsScreen::show(const Blinds &blinds, int tableNumber, int batteryPercent, std::function<void()> onNavigateToPlayers, std::function<void()> onToggleClock)
 {
     timeLabel_ = nullptr;
     batteryLabel_ = nullptr;
@@ -70,9 +70,9 @@ void BlindsScreen::show(const Blinds &blinds, int tableNumber, float batteryVolt
     lv_obj_set_style_text_font(timeLabel_, &lv_font_montserrat_48, 0);
     lv_obj_align(timeLabel_, LV_ALIGN_BOTTOM_MID, 0, -64);
 
-    // 5. Battery voltage, small and centered directly above the time remaining
+    // 5. Battery level, small and centered directly above the time remaining
     batteryLabel_ = lv_label_create(lv_scr_act());
-    setBatteryText(batteryLabel_, batteryVoltage);
+    setBatteryText(batteryLabel_, batteryPercent);
     lv_obj_set_width(batteryLabel_, kBatteryLabelWidth);
     lv_obj_set_style_text_align(batteryLabel_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(batteryLabel_, lv_color_hex(kBatteryLabelColor), 0);
@@ -117,10 +117,10 @@ void BlindsScreen::updateTimeRemaining(const String &timeRemaining)
     }
 }
 
-void BlindsScreen::updateBatteryVoltage(float batteryVoltage)
+void BlindsScreen::updateBatteryLevel(int batteryPercent)
 {
     if (batteryLabel_)
     {
-        setBatteryText(batteryLabel_, batteryVoltage);
+        setBatteryText(batteryLabel_, batteryPercent);
     }
 }

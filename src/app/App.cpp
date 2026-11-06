@@ -22,6 +22,55 @@ namespace
         float pinVolts = static_cast<float>(sumMv) / AppConfig::kBatteryAdcSamples / 1000.0f;
         return pinVolts * AppConfig::kBatteryDividerRatio;
     }
+
+    // Maps a 1S LiPo voltage to 0-100% by interpolating a resting discharge curve.
+    int getBatteryPercentage(float voltage)
+    {
+        struct DataPoint
+        {
+            float V;
+            int P;
+        };
+
+        constexpr int kNumPoints = 11;
+        constexpr DataPoint kLookup[kNumPoints] = {
+            {4.20f, 100},
+            {4.15f, 95},
+            {4.10f, 90},
+            {4.00f, 80},
+            {3.90f, 70},
+            {3.82f, 50}, // Ideal storage level
+            {3.75f, 40},
+            {3.70f, 30}, // Nominal voltage
+            {3.65f, 20},
+            {3.60f, 15},
+            {3.50f, 0}   // Hard cutoff to protect cell life
+        };
+
+        if (voltage >= kLookup[0].V)
+        {
+            return 100;
+        }
+        if (voltage <= kLookup[kNumPoints - 1].V)
+        {
+            return 0;
+        }
+
+        for (int i = 0; i < kNumPoints - 1; i++)
+        {
+            if (voltage >= kLookup[i + 1].V)
+            {
+                float vUpper = kLookup[i].V;
+                float vLower = kLookup[i + 1].V;
+                int pUpper = kLookup[i].P;
+                int pLower = kLookup[i + 1].P;
+
+                float fraction = (voltage - vLower) / (vUpper - vLower);
+                return pLower + static_cast<int>(fraction * (pUpper - pLower));
+            }
+        }
+        return 0;
+    }
 }
 
 // ==========================================
@@ -87,7 +136,7 @@ void App::fetchBlindsAndShowScreen()
         blindsLastTickMs_ = millis();
         blindsLastResyncMs_ = millis();
 
-        blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, [this]
+        blindsScreen_.show(blinds, selectedTableNumber_, batteryPercent_, [this]
                            { fetchPlayersAndShowScreen(); }, [this]
                            { onClockToggled(); });
     }
@@ -123,7 +172,7 @@ void App::resyncBlinds()
 
     lv_obj_clean(lv_scr_act());
     displayManager_.setDarkBackground();
-    blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, [this]
+    blindsScreen_.show(blinds, selectedTableNumber_, batteryPercent_, [this]
                        { fetchPlayersAndShowScreen(); }, [this]
                        { onClockToggled(); });
 }
@@ -181,8 +230,8 @@ void App::updateBlindsCountdown()
     }
 }
 
-// Re-reads the battery voltage once per kBatteryRefreshIntervalMs and updates the label if the Blinds screen is showing.
-void App::updateBatteryVoltage()
+// Re-reads the battery once per kBatteryRefreshIntervalMs and updates the label if the Blinds screen is showing.
+void App::updateBatteryLevel()
 {
     unsigned long now = millis();
     if (now - batteryLastReadMs_ < kBatteryRefreshIntervalMs)
@@ -191,11 +240,11 @@ void App::updateBatteryVoltage()
     }
 
     batteryLastReadMs_ = now;
-    batteryVoltage_ = readBatteryVoltage();
+    batteryPercent_ = getBatteryPercentage(readBatteryVoltage());
 
     if (state_ == AppState::Blinds)
     {
-        blindsScreen_.updateBatteryVoltage(batteryVoltage_);
+        blindsScreen_.updateBatteryLevel(batteryPercent_);
     }
 }
 
@@ -386,7 +435,7 @@ void App::begin()
 
     pinMode(AppConfig::kBatteryAdcPin, INPUT);
     analogSetPinAttenuation(AppConfig::kBatteryAdcPin, ADC_11db);
-    batteryVoltage_ = readBatteryVoltage();
+    batteryPercent_ = getBatteryPercentage(readBatteryVoltage());
     batteryLastReadMs_ = millis();
 
     createBaseUi();
@@ -404,7 +453,7 @@ void App::loop()
         updateBlindsCountdown();
     }
 
-    updateBatteryVoltage();
+    updateBatteryLevel();
 
     lv_timer_handler();
     delay(5);

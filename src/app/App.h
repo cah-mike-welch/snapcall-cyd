@@ -36,7 +36,7 @@ private:
     void fetchPlayersAndShowScreen();
     void resyncBlinds();
     void updateBlindsCountdown();
-    void updateBatteryVoltage();
+    void updateBatteryLevel();
     void onClockToggled();
 
     void onClubSelected(const Club &club);
@@ -75,8 +75,8 @@ private:
     unsigned long blindsLastResyncMs_ = 0;
     bool blindsResyncPending_ = false;
 
-    // Battery voltage: read on boot and then once per minute; shown on the Blinds screen.
-    float batteryVoltage_ = 0.0f;
+    // Battery level (0-100%): read on boot and then once per minute; shown on the Blinds screen.
+    int batteryPercent_ = 0;
     unsigned long batteryLastReadMs_ = 0;
 
     lv_obj_t *labelStatus_ = nullptr;
