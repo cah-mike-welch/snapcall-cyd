@@ -3,7 +3,8 @@
 
 namespace
 {
-    constexpr int kButtonWidth = 100;
+    constexpr int kEliminateButtonWidth = 130;
+    constexpr int kCancelButtonWidth = 80;
     constexpr int kButtonHeight = 50;
 }
 
@@ -15,6 +16,7 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_t *title_label = lv_label_create(lv_scr_act());
     lv_label_set_text(title_label, "Eliminate Player?");
     lv_obj_set_style_text_color(title_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_20, 0);
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 60);
 
     char name_buf[64];
@@ -26,8 +28,8 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_align(name_label, LV_ALIGN_CENTER, 0, -20);
 
     lv_obj_t *eliminateBtn = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(eliminateBtn, kButtonWidth, kButtonHeight);
-    lv_obj_align(eliminateBtn, LV_ALIGN_BOTTOM_MID, -60, -40);
+    lv_obj_set_size(eliminateBtn, kEliminateButtonWidth, kButtonHeight);
+    lv_obj_align(eliminateBtn, LV_ALIGN_BOTTOM_MID, -46, -40);
     UiTheme::styleButton(eliminateBtn);
     lv_obj_set_style_border_color(eliminateBtn, lv_color_white(), 0);
     lv_obj_set_style_border_width(eliminateBtn, 1, 0);
@@ -40,8 +42,8 @@ void ConfirmEliminateScreen::show(const Player &player, std::function<void()> on
     lv_obj_center(eliminateLabel);
 
     lv_obj_t *cancelBtn = lv_btn_create(lv_scr_act());
-    lv_obj_set_size(cancelBtn, kButtonWidth, kButtonHeight);
-    lv_obj_align(cancelBtn, LV_ALIGN_BOTTOM_MID, 60, -40);
+    lv_obj_set_size(cancelBtn, kCancelButtonWidth, kButtonHeight);
+    lv_obj_align(cancelBtn, LV_ALIGN_BOTTOM_MID, 71, -40);
     UiTheme::styleButton(cancelBtn);
     lv_obj_set_style_border_color(cancelBtn, lv_color_white(), 0);
     lv_obj_set_style_border_width(cancelBtn, 1, 0);

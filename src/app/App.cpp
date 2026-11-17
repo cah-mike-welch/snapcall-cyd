@@ -138,7 +138,7 @@ void App::fetchBlindsAndShowScreen()
 
         blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, batteryPercent_, [this]
                            { fetchPlayersAndShowScreen(); }, [this]
-                           { onClockToggled(); });
+                           { onClockToggleRequested(); });
     }
     else
     {
@@ -174,18 +174,28 @@ void App::resyncBlinds()
     displayManager_.setDarkBackground();
     blindsScreen_.show(blinds, selectedTableNumber_, batteryVoltage_, batteryPercent_, [this]
                        { fetchPlayersAndShowScreen(); }, [this]
-                       { onClockToggled(); });
+                       { onClockToggleRequested(); });
 }
 
-// Starts or stops the clock based on the last known state. The resync is deferred to the next loop tick
-// because it rebuilds the screen, which would delete the button whose click event is still being dispatched.
-void App::onClockToggled()
+// Opens the confirmation screen before the clock is started or stopped. No API call is made here.
+void App::onClockToggleRequested()
 {
-    if (!wifiManager_.isConnected())
-    {
-        return;
-    }
+    lv_obj_clean(lv_scr_act());
+    displayManager_.setDarkBackground();
 
+    confirmClockScreen_.show(
+        currentBlinds_.isRunning,
+        [this]
+        { onClockConfirmed(); },
+        [this]
+        { onClockCancelled(); });
+
+    state_ = AppState::ConfirmClock;
+}
+
+// Starts or stops the clock based on the last known state, then reloads the Blinds screen from the API.
+void App::onClockConfirmed()
+{
     ApiResult result = currentBlinds_.isRunning
                            ? apiClient_.stopClock(selectedClubId_)
                            : apiClient_.startClock(selectedClubId_);
@@ -195,7 +205,12 @@ void App::onClockToggled()
         Serial.println("[API] Failed to toggle clock");
     }
 
-    blindsResyncPending_ = true;
+    fetchBlindsAndShowScreen();
+}
+
+void App::onClockCancelled()
+{
+    fetchBlindsAndShowScreen();
 }
 
 // Ticks the countdown once per second (only while the clock is running) and resyncs from the API periodically.
@@ -203,9 +218,8 @@ void App::updateBlindsCountdown()
 {
     unsigned long now = millis();
 
-    if (blindsResyncPending_ || now - blindsLastResyncMs_ >= kBlindsResyncIntervalMs)
+    if (now - blindsLastResyncMs_ >= kBlindsResyncIntervalMs)
     {
-        blindsResyncPending_ = false;
         blindsLastResyncMs_ = now;
         resyncBlinds();
         return;

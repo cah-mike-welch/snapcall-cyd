@@ -11,6 +11,7 @@
 #include "screens/BlindsScreen.h"
 #include "screens/PlayersScreen.h"
 #include "screens/ConfirmEliminateScreen.h"
+#include "screens/ConfirmClockScreen.h"
 
 enum class AppState
 {
@@ -18,7 +19,8 @@ enum class AppState
     TableSelection,
     Blinds,
     Players,
-    ConfirmEliminate
+    ConfirmEliminate,
+    ConfirmClock
 };
 
 // Coordinates WiFi, the API client, the display/touch hardware, and screen navigation.
@@ -37,7 +39,9 @@ private:
     void resyncBlinds();
     void updateBlindsCountdown();
     void updateBatteryLevel();
-    void onClockToggled();
+    void onClockToggleRequested();
+    void onClockConfirmed();
+    void onClockCancelled();
 
     void onClubSelected(const Club &club);
     void onTableSelected(const Table &table);
@@ -66,6 +70,7 @@ private:
     PlayersScreen playersScreen_;
     ConfirmEliminateScreen confirmEliminateScreen_;
     Player selectedPlayerForElimination_;
+    ConfirmClockScreen confirmClockScreen_;
 
     // Blinds countdown: server is the source of truth, resynced every kBlindsResyncIntervalMs.
     Blinds currentBlinds_;
@@ -73,7 +78,6 @@ private:
     bool blindsTimeUsesHours_ = false;
     unsigned long blindsLastTickMs_ = 0;
     unsigned long blindsLastResyncMs_ = 0;
-    bool blindsResyncPending_ = false;
 
     // Battery level: voltage and percent (0-100%), read on boot and then once per minute; shown on the Blinds screen.
     float batteryVoltage_ = 0.0f;
