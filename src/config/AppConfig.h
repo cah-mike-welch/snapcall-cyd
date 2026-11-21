@@ -31,17 +31,24 @@ namespace AppConfig
     constexpr uint16_t kScreenWidth = 240;
     constexpr uint16_t kScreenHeight = 320;
 
-    // WiFi networks, tried in order via WiFiMulti
+    // WiFi networks compiled into the firmware. Passwords saved from the setup screen are kept in flash and tried first.
     struct WifiCredential
     {
         const char *ssid;
         const char *password;
     };
 
+    constexpr unsigned long kWifiConnectTimeoutMs = 10000;       // per known network at boot and on retry
+    constexpr unsigned long kWifiSetupConnectTimeoutMs = 20000;  // network entered on the setup screen
+    constexpr unsigned long kWifiRetryIntervalMs = 30000;        // how often to retry while disconnected
+    constexpr uint8_t kWifiMaxSavedNetworks = 8;
+
     constexpr WifiCredential kWifiNetworks[] = {
-        {"370Katiebud", "mbebmike"},
+        // {"370Katiebud", "mbebmike"},  // temporarily disabled to test the WiFi setup screen
         {"IHC of Cincinnati", "1r1shJig"},
         {"milford", "5133255070"},
+        {"Gibby House 2", "Maisy2019"},
+        {"Mike's iPhone 12", "mikemike"},
     };
 
     // API

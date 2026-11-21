@@ -1,21 +1,37 @@
 #pragma once
 
 #include <WiFi.h>
-#include <WiFiMulti.h>
+#include <vector>
 
-// Wraps WiFiMulti setup/connect/reconnect so the rest of the app never touches WiFiMulti directly.
+struct WifiScanResult
+{
+    String ssid;
+    int32_t rssi;
+};
+
+// Owns Wi-Fi connection logic: compiled-in and user-saved networks, scanning, timed connects, and retries.
 class WifiManager
 {
 public:
-    // Configures WIFI_STA, adds the configured APs, and blocks until connected.
-    void begin();
+    // Starts STA mode and makes one pass over the known networks. Returns true if connected.
+    bool begin();
 
-    // Call from loop(); reconnects if the connection was lost.
+    // Call from loop(); retries known networks on an interval while disconnected.
     void maintainConnection();
 
+    // Blocking scan. Returns unique SSIDs, strongest first.
+    std::vector<WifiScanResult> scan();
+
+    // Blocking connect with a longer timeout. Saves the network to flash on success.
+    bool connectTo(const String &ssid, const String &password);
+
     bool isConnected() const;
-    IPAddress localIP() const;
+    String ssid() const;
 
 private:
-    WiFiMulti wifiMulti_;
+    bool tryKnownNetworks();
+    bool attemptConnect(const String &ssid, const String &password, unsigned long timeoutMs);
+    void saveNetwork(const String &ssid, const String &password);
+
+    unsigned long lastRetryMs_ = 0;
 };

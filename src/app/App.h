@@ -12,6 +12,7 @@
 #include "screens/PlayersScreen.h"
 #include "screens/ConfirmEliminateScreen.h"
 #include "screens/ConfirmClockScreen.h"
+#include "screens/WifiSetupScreen.h"
 
 enum class AppState
 {
@@ -20,7 +21,10 @@ enum class AppState
     Blinds,
     Players,
     ConfirmEliminate,
-    ConfirmClock
+    ConfirmClock,
+    NoWifi,
+    WifiSetupList,
+    WifiSetupPassword
 };
 
 // Coordinates WiFi, the API client, the display/touch hardware, and screen navigation.
@@ -32,6 +36,11 @@ public:
 
 private:
     void createBaseUi();
+    void enterMainUi();
+    void showNoWifiScreen();
+    void showWifiNetworkList();
+    void showWifiPasswordEntry(const String &ssid);
+    void onWifiPasswordEntered(const String &password);
     void fetchClubsAndShowScreen();
     void fetchTablesAndShowScreen();
     void fetchBlindsAndShowScreen();
@@ -71,6 +80,9 @@ private:
     ConfirmEliminateScreen confirmEliminateScreen_;
     Player selectedPlayerForElimination_;
     ConfirmClockScreen confirmClockScreen_;
+
+    WifiSetupScreen wifiSetupScreen_;
+    String selectedWifiSsid_;
 
     // Blinds countdown: server is the source of truth, resynced every kBlindsResyncIntervalMs.
     Blinds currentBlinds_;

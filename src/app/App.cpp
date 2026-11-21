@@ -88,7 +88,7 @@ void App::createBaseUi()
 
     if (wifiManager_.isConnected())
     {
-        String wifiInfo = "WiFi: Connected\nIP: " + wifiManager_.localIP().toString();
+        String wifiInfo = "WiFi: Connected\nSSID: " + wifiManager_.ssid();
         lv_label_set_text(labelWifi_, wifiInfo.c_str());
     }
     else
@@ -370,7 +370,7 @@ void App::fetchTablesAndShowScreen()
         tableScreen_->show(tournament, [this](const Table &table)
                            { onTableSelected(table); });
 
-        lv_label_set_text(labelStatus_, "Select a table.");
+        lv_label_set_text(labelStatus_, "");
         lv_obj_set_style_text_color(labelStatus_, lv_color_white(), 0);
     }
     else if (result == ApiResult::ParseError)
@@ -435,6 +435,76 @@ void App::fetchClubsAndShowScreen()
 }
 
 // ==========================================
+// WIFI SETUP
+// ==========================================
+// Shown when no saved or compiled-in network connects at boot.
+void App::showNoWifiScreen()
+{
+    state_ = AppState::NoWifi;
+    displayManager_.setDarkBackground();
+    wifiSetupScreen_.showNoWifi([this]
+                                { showWifiNetworkList(); });
+}
+
+void App::showWifiNetworkList()
+{
+    state_ = AppState::WifiSetupList;
+    wifiSetupScreen_.showMessage("Scanning for networks...");
+    lv_refr_now(NULL);
+
+    std::vector<WifiScanResult> networks = wifiManager_.scan();
+    wifiSetupScreen_.showNetworkList(
+        networks,
+        [this](const String &ssid)
+        { showWifiPasswordEntry(ssid); },
+        [this]
+        { showWifiNetworkList(); },
+        [this]
+        { showNoWifiScreen(); });
+}
+
+void App::showWifiPasswordEntry(const String &ssid)
+{
+    selectedWifiSsid_ = ssid;
+    state_ = AppState::WifiSetupPassword;
+    wifiSetupScreen_.showPasswordEntry(
+        ssid,
+        [this](const String &password)
+        { onWifiPasswordEntered(password); },
+        [this]
+        { showWifiNetworkList(); });
+}
+
+void App::onWifiPasswordEntered(const String &password)
+{
+    if (state_ != AppState::WifiSetupPassword)
+    {
+        return;
+    }
+
+    wifiSetupScreen_.setStatus("Connecting to " + selectedWifiSsid_ + "...");
+    lv_refr_now(NULL);
+
+    if (wifiManager_.connectTo(selectedWifiSsid_, password))
+    {
+        enterMainUi();
+    }
+    else
+    {
+        wifiSetupScreen_.setStatus("Could not connect. Check the password and try again.");
+    }
+}
+
+// Builds the normal app screens once Wi-Fi is up.
+void App::enterMainUi()
+{
+    wifiSetupScreen_.clear();
+    createBaseUi();
+    state_ = AppState::ClubSelection;
+    fetchClubsAndShowScreen();
+}
+
+// ==========================================
 // LIFECYCLE
 // ==========================================
 void App::begin()
@@ -444,7 +514,6 @@ void App::begin()
 
     Serial.println("\n--- Initializing ESP32 CYD ---");
 
-    wifiManager_.begin();
     displayManager_.begin();
     touchManager_.begin();
 
@@ -454,15 +523,31 @@ void App::begin()
     batteryPercent_ = getBatteryPercentage(batteryVoltage_);
     batteryLastReadMs_ = millis();
 
-    createBaseUi();
-    fetchClubsAndShowScreen();
+    if (wifiManager_.begin())
+    {
+        enterMainUi();
+    }
+    else
+    {
+        showNoWifiScreen();
+    }
 
     Serial.println("[SYSTEM] Setup complete.");
 }
 
 void App::loop()
 {
-    wifiManager_.maintainConnection();
+    // Setup screens own the Wi-Fi flow, so the background reconnect is paused while they are open.
+    const bool inWifiSetup = state_ == AppState::WifiSetupList || state_ == AppState::WifiSetupPassword;
+    if (!inWifiSetup)
+    {
+        wifiManager_.maintainConnection();
+    }
+
+    if (state_ == AppState::NoWifi && wifiManager_.isConnected())
+    {
+        enterMainUi();
+    }
 
     if (state_ == AppState::Blinds)
     {
